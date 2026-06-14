@@ -16,7 +16,6 @@ charset-normalizer==3.4.6
 click==8.4.1
 colorama==0.4.6
 cryptography==46.0.6
-cssselect2==0.9.0
 dj-database-url==3.1.2
 Django==6.0.6
 dnspython==2.8.0
@@ -104,7 +103,6 @@ starlette==0.37.2
 sympy==1.14.0
 tabulate==0.10.0
 threadpoolctl==3.6.0
-tinycss2==1.4.0
 tinyhtml5==2.1.0
 tokenizers==0.22.2
 torch==2.12.0
