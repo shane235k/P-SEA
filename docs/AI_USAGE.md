@@ -16,14 +16,14 @@ This document tracks the usage of AI tools during the development of the SplitAu
 
 ## 2. AI Correction Log (3 Cases)
 
-### Case 1: Fetching all the expenses records at once and displaying them
+### Case 1: Transaction Approach
 
 * **What the AI did**:
-  Fetched all the records from the DB and displayed them all at once on the expenses info page.
+  Used Greedy Algorithim to calculate the net expenses instead of direct transactions view and simplified them into simple transactions
 * **Why it was Wrong**:
-  Not only is that not optimal, a record containing hundreds of expenses could easily extend the current page 10 times the width of the normal page.
+  Direct transation view which was specifically asked in the problem statement, and shown as one of the key demands made by "Rohan" was entirely not present, greedy algorithm can show that you have to pay A 5000, but it won't necessarily mean its true w.r.t to actual money that you owe A, it just simplifies transations by giving user positive and negative weights and then makes the user to pay in the group's net pool.
 * **How it was Corrected**:
-  We used pagination to handle this, with a record limit of 15.
+  Added toggle button to switch between simplification or the direct payment matrix, at the same time, none of them would break it, the final net amount will be calculated based on how muchh each user received and paid.
 
 ---
 
@@ -36,7 +36,7 @@ This document tracks the usage of AI tools during the development of the SplitAu
 * **How it was Corrected**:
   So instead of manually creating a user and running the engine again the engine does it for you. It creates a user with the missing person's name and the credentials for the same are visible on top of the report, alternatively admin can also reject the record.
 
-  
+
 ### Case 3: Approving every row instead of utilising policies
 
 * **What the AI Suggested**:

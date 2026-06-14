@@ -4,6 +4,15 @@
 {% block title %}{{ group.name }} - SplitAudit{% endblock %}
 
 {% block content %}
+<style>
+    /* Chevron rotation effect */
+    .member-row[aria-expanded="true"] .bi-chevron-down {
+        transform: rotate(180deg);
+    }
+    .member-row .bi-chevron-down {
+        transition: transform 0.2s ease-in-out;
+    }
+</style>
 <!-- Top Header Area -->
 <div class="row align-items-center mb-4">
     <div class="col-md-7">
@@ -91,12 +100,17 @@
                     </thead>
                     <tbody>
                         {% for p_id, bal in balances.items %}
-                        <tr style="cursor: pointer;" onclick="showExplanation('{{ p_id }}', '{{ bal.participant.name }}')" class="member-row" id="row-{{ p_id }}">
+                        <tr style="cursor: pointer;" onclick="showExplanation('{{ p_id }}', '{{ bal.participant.name }}')" class="member-row" id="row-{{ p_id }}" data-bs-toggle="collapse" data-bs-target="#balance-detail-{{ p_id }}" aria-expanded="false" aria-controls="balance-detail-{{ p_id }}">
                             <td>
-                                <div class="fw-semibold text-dark">{{ bal.participant.name }}</div>
-                                {% if bal.participant.is_external %}
-                                <span class="badge badge-external small" style="font-size: 9px;">External</span>
-                                {% endif %}
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <div class="fw-semibold text-dark">{{ bal.participant.name }}</div>
+                                        {% if bal.participant.is_external %}
+                                        <span class="badge badge-external small" style="font-size: 9px;">External</span>
+                                        {% endif %}
+                                    </div>
+                                    <i class="bi bi-chevron-down text-secondary ms-2 small" style="font-size: 11px;"></i>
+                                </div>
                             </td>
                             <td class="text-end fw-bold font-monospace">
                                 {% if bal.net > 0 %}
@@ -106,6 +120,77 @@
                                 {% else %}
                                     <span class="text-secondary">₹0.00</span>
                                 {% endif %}
+                            </td>
+                        </tr>
+                        <tr class="collapse" id="balance-detail-{{ p_id }}">
+                            <td colspan="2" class="p-0 border-0">
+                                <div class="p-3 bg-light-subtle border-start border-end border-bottom" style="font-size: 13px;">
+                                    <!-- Outgoing Debts (Owes) -->
+                                    <div class="mb-3">
+                                        <div class="fw-bold text-secondary mb-2" style="font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase;">
+                                            Who will {{ bal.participant.name }} pay to?
+                                        </div>
+                                        {% for simp in bal.owes %}
+                                        <div class="border border-light-subtle rounded p-2 mb-2 bg-white">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <span class="small font-monospace">Pays <strong>{{ simp.to.name }}</strong></span>
+                                                <span class="fw-bold text-danger font-monospace small">₹{{ simp.amount|floatformat:2 }}</span>
+                                            </div>
+                                            <!-- Collapsible Details of split/settlements -->
+                                            <div class="border-top pt-1 mt-1">
+                                                <div class="list-group list-group-flush font-monospace">
+                                                    {% for detail in simp.details %}
+                                                    <div class="d-flex justify-content-between py-1" style="font-size: 11px;">
+                                                        <span class="text-truncate text-secondary" style="max-width: 250px;">
+                                                            {{ detail.date|date:"Y-m-d" }} &bull; {{ detail.description }}
+                                                            <span class="badge bg-light text-secondary border ms-1" style="font-size: 9px;">{{ detail.type }}</span>
+                                                        </span>
+                                                        <span class="{% if detail.sign == '+' %}text-danger{% else %}text-success{% endif %}" style="font-weight: 500;">
+                                                            {{ detail.sign }}₹{{ detail.amount|floatformat:2 }}
+                                                        </span>
+                                                    </div>
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% empty %}
+                                        <div class="text-muted small ps-2 font-monospace" style="font-size: 11.5px;">No outgoing payments.</div>
+                                        {% endfor %}
+                                    </div>
+
+                                    <!-- Incoming Debts (Owed By) -->
+                                    <div>
+                                        <div class="fw-bold text-secondary mb-2" style="font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase;">
+                                            Who will pay {{ bal.participant.name }}?
+                                        </div>
+                                        {% for simp in bal.owed_by %}
+                                        <div class="border border-light-subtle rounded p-2 mb-2 bg-white">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <span class="small font-monospace">Receives from <strong>{{ simp.from.name }}</strong></span>
+                                                <span class="fw-bold text-success font-monospace small">₹{{ simp.amount|floatformat:2 }}</span>
+                                            </div>
+                                            <!-- Collapsible Details of split/settlements -->
+                                            <div class="border-top pt-1 mt-1">
+                                                <div class="list-group list-group-flush font-monospace">
+                                                    {% for detail in simp.details %}
+                                                    <div class="d-flex justify-content-between py-1" style="font-size: 11px;">
+                                                        <span class="text-truncate text-secondary" style="max-width: 250px;">
+                                                            {{ detail.date|date:"Y-m-d" }} &bull; {{ detail.description }}
+                                                            <span class="badge bg-light text-secondary border ms-1" style="font-size: 9px;">{{ detail.type }}</span>
+                                                        </span>
+                                                        <span class="{% if detail.sign == '+' %}text-danger{% else %}text-success{% endif %}" style="font-weight: 500;">
+                                                            {{ detail.sign }}₹{{ detail.amount|floatformat:2 }}
+                                                        </span>
+                                                    </div>
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% empty %}
+                                        <div class="text-muted small ps-2 font-monospace" style="font-size: 11.5px;">No incoming payments.</div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}
@@ -119,19 +204,65 @@
 
         <!-- Debt Simplification -->
         <div class="card bg-white border border-light-subtle shadow-sm p-4 mb-4" style="border-radius: 12px;">
-            <h4 class="mb-3 text-dark fw-bold" style="font-size: 16px;">
-                <i class="bi bi-arrow-left-right text-primary me-2"></i> Debt Simplification
-            </h4>
-            {% for simp in simplifications %}
-            <div class="alert alert-secondary border border-light-subtle d-flex justify-content-between align-items-center py-2 px-3 mb-2 font-monospace small">
-                <div>
-                    <strong>{{ simp.from.name }}</strong> owes <strong>{{ simp.to.name }}</strong>
-                </div>
-                <div class="fw-bold text-dark">₹{{ simp.amount|floatformat:2 }}</div>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="text-dark mb-0 fw-bold" style="font-size: 16px;">
+                    <i class="bi bi-arrow-left-right text-primary me-2"></i>
+                    {% if simplify %}Debt Transfers (Simplified){% else %}Debt Transfers (Direct){% endif %}
+                </h4>
+                
+                <!-- Toggle switch -->
+                <form method="GET" class="d-inline-block" id="simplify-form">
+                    <input type="hidden" name="tab" value="overview">
+                    <input type="hidden" name="simplify" id="simplify-hidden" value="{% if simplify %}true{% else %}false{% endif %}">
+                    <div class="form-check form-switch p-0 m-0 d-inline-flex align-items-center">
+                        <input class="form-check-input ms-0 me-2" type="checkbox" role="switch" id="simplify_debts" {% if simplify %}checked{% endif %} onchange="document.getElementById('simplify-hidden').value = this.checked ? 'true' : 'false'; this.form.submit();">
+                        <label class="form-check-label text-secondary small fw-semibold" for="simplify_debts" style="font-size: 12px; cursor: pointer;">Simplify</label>
+                    </div>
+                </form>
             </div>
-            {% empty %}
-            <div class="text-center text-muted py-3 small">All debts are fully settled!</div>
-            {% endfor %}
+            <div class="accordion" id="debtTransfersAccordion">
+                {% for simp in simplifications %}
+                <div class="accordion-item border border-light-subtle mb-2" style="border-radius: 8px; overflow: hidden;">
+                    <h2 class="accordion-header" id="heading-{{ forloop.counter }}">
+                        <button class="accordion-button collapsed bg-light text-dark font-monospace py-2 px-3 small shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ forloop.counter }}" aria-expanded="false" aria-controls="collapse-{{ forloop.counter }}" style="font-size: 13px;">
+                            <div class="d-flex justify-content-between align-items-center w-100 me-3">
+                                <div>
+                                    <strong>{{ simp.from.name }}</strong> owes <strong>{{ simp.to.name }}</strong>
+                                </div>
+                                <div class="fw-bold text-dark">₹{{ simp.amount|floatformat:2 }}</div>
+                            </div>
+                        </button>
+                    </h2>
+                    <div id="collapse-{{ forloop.counter }}" class="accordion-collapse collapse" aria-labelledby="heading-{{ forloop.counter }}" data-bs-parent="#debtTransfersAccordion">
+                        <div class="accordion-body bg-white p-0">
+                            {% if simplify %}
+                            <div class="bg-warning-subtle text-warning-emphasis px-3 py-1 small border-bottom" style="font-size: 11px;">
+                                <i class="bi bi-info-circle-fill me-1"></i> Shown as context (simplified from direct balances below).
+                            </div>
+                            {% endif %}
+                            <div class="list-group list-group-flush small">
+                                {% for detail in simp.details %}
+                                <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 font-monospace" style="font-size: 11.5px;">
+                                    <div>
+                                        <span class="text-secondary">{{ detail.date|date:"Y-m-d" }}</span> &bull; 
+                                        <span class="text-dark">{{ detail.description }}</span>
+                                        <span class="badge bg-light text-secondary border ms-1">{{ detail.type }}</span>
+                                    </div>
+                                    <div class="fw-semibold {% if detail.sign == '+' %}text-danger{% else %}text-success{% endif %}">
+                                        {{ detail.sign }}₹{{ detail.amount|floatformat:2 }}
+                                    </div>
+                                </div>
+                                {% empty %}
+                                <div class="list-group-item text-center text-muted py-2">No direct transactions between these members.</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center text-muted py-3 small">All debts are fully settled!</div>
+                {% endfor %}
+            </div>
         </div>
 
         <!-- Explainable Balance Panel (Dynamic) -->

@@ -38,16 +38,24 @@ def dashboard_view(request):
     people_you_owe = {}  # {participant_name: total_amount}
     people_who_owe_you = {}  # {participant_name: total_amount}
     total_net_balance = Decimal('0.00')
+    dashboard_debts = []
     
     # Iterate through all groups the user is member of to compute aggregate balances
     for g in user_groups:
         balances_data = get_group_balances(g)
         
+        user_net = Decimal('0.00')
+        owes_list = []
+        owed_by_list = []
+        ledger_records = []
+        
         # User net in this group
         if participant.id in balances_data['balances']:
             user_bal = balances_data['balances'][participant.id]
             net_balances_by_group[g.id] = user_bal['net']
+            user_net = user_bal['net']
             total_net_balance += user_bal['net']
+            ledger_records = balances_data['explanations'].get(participant.id, [])
             
         # Simplified debts in this group
         for simp in balances_data['simplifications']:
@@ -55,16 +63,27 @@ def dashboard_view(request):
                 # User owes someone
                 to_name = simp['to'].name
                 people_you_owe[to_name] = people_you_owe.get(to_name, Decimal('0.00')) + simp['amount']
+                owes_list.append(simp)
             elif simp['to'].id == participant.id:
                 # Someone owes User
                 from_name = simp['from'].name
                 people_who_owe_you[from_name] = people_who_owe_you.get(from_name, Decimal('0.00')) + simp['amount']
+                owed_by_list.append(simp)
+                
+        if user_net != 0 or owes_list or owed_by_list or ledger_records:
+            dashboard_debts.append({
+                'group': g,
+                'net': user_net,
+                'owes': owes_list,
+                'owed_by': owed_by_list,
+                'ledger_records': ledger_records
+            })
 
     # Search and sorting query parameters
     query = request.GET.get('q', '').strip()
     sort_by = request.GET.get('sort_by', '-date').strip()
     
-    expenses_qs = Expense.objects.filter(group__in=user_groups)
+    expenses_qs = Expense.objects.filter(group__in=user_groups, paid_by=participant).prefetch_related('splits', 'splits__participant')
     
     if query:
         expenses_qs = expenses_qs.filter(
@@ -162,7 +181,8 @@ def dashboard_view(request):
         'recent_settlements': recent_settlements,
         'import_status': import_status,
         'q_query': query,
-        'sort_by': sort_by
+        'sort_by': sort_by,
+        'dashboard_debts': dashboard_debts
     }
     return render(request, 'groups/dashboard.html', context)
 
@@ -202,7 +222,21 @@ def group_detail_view(request, group_id):
         return redirect('dashboard')
         
     # Calculate balances
-    balances_data = get_group_balances(group)
+    simplify = request.GET.get('simplify', 'true') != 'false'
+    balances_data = get_group_balances(group, simplify=simplify)
+    
+    # Attach 'owes' and 'owed_by' lists directly to each participant's balance dictionary for easy template rendering
+    for p_id, bal in balances_data['balances'].items():
+        bal['owes'] = []
+        bal['owed_by'] = []
+        
+    for simp in balances_data['simplifications']:
+        from_id = simp['from'].id
+        to_id = simp['to'].id
+        if from_id in balances_data['balances']:
+            balances_data['balances'][from_id]['owes'].append(simp)
+        if to_id in balances_data['balances']:
+            balances_data['balances'][to_id]['owed_by'].append(simp)
     
     # Expenses (Include Active, Draft, Inactive)
     expenses_qs = group.expenses.all().order_by('-expense_date', '-created_at')
@@ -261,7 +295,8 @@ def group_detail_view(request, group_id):
         'user_part_id': user_part_id,
         'active_tab': active_tab,
         'contributions_json': contributions,
-        'chart_balances_json': chart_balances
+        'chart_balances_json': chart_balances,
+        'simplify': simplify
     }
     return render(request, 'groups/group_detail.html', context)
 

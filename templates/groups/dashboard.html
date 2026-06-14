@@ -4,6 +4,18 @@
 {% block title %}Dashboard - SplitAudit{% endblock %}
 
 {% block content %}
+<style>
+    /* Custom Chevron styling for accordion */
+    .dashboard-accordion-btn::after {
+        display: none !important;
+    }
+    .dashboard-accordion-btn:not(.collapsed) .bi-chevron-down {
+        transform: rotate(180deg);
+    }
+    .dashboard-accordion-btn .bi-chevron-down {
+        transition: transform 0.2s ease-in-out;
+    }
+</style>
 <!-- Top Header Area resembling mockup -->
 <div class="row align-items-center mb-4 animate__animated animate__fadeIn">
     <div class="col-md-7">
@@ -100,6 +112,130 @@
 
     <!-- Right Column: Budgets / Active Groups & Recent Expenses Table -->
     <div class="col-lg-8">
+        <!-- Consolidated Debts & Receivables (LoggedIn User Specific) -->
+        <div class="card bg-white border border-light-subtle shadow-sm p-4 mb-4" style="border-radius: 12px;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="text-dark mb-0 fw-bold" style="font-size: 16px;">
+                    <i class="bi bi-wallet2 text-primary me-2"></i> Consolidated Debts & Receivables
+                </h4>
+                <div class="fw-bold font-monospace px-3 py-1 bg-light border rounded" style="font-size: 13.5px;">
+                    Total Net: 
+                    {% if total_net_balance > 0 %}
+                        <span class="text-success">+₹{{ total_net_balance|floatformat:2 }}</span>
+                    {% elif total_net_balance < 0 %}
+                        <span class="text-danger">-₹{{ total_net_balance|absolute|floatformat:2 }}</span>
+                    {% else %}
+                        <span class="text-secondary">₹0.00</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <p class="text-secondary small mb-3" style="font-size: 11.5px;">
+                <i class="bi bi-info-circle"></i> Showing active debt balances and explanation records for your account across all groups.
+            </p>
+
+            <div class="accordion" id="dashboardDebtsAccordion">
+                {% for db in dashboard_debts %}
+                <div class="accordion-item border border-light-subtle mb-3 animate__animated animate__fadeIn" style="border-radius: 8px; overflow: hidden;">
+                    <h2 class="accordion-header" id="dash-heading-{{ forloop.counter }}">
+                        <button class="accordion-button {% if forloop.counter > 1 %}collapsed{% endif %} dashboard-accordion-btn bg-light text-dark font-monospace py-2 px-3 small shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#dash-collapse-{{ forloop.counter }}" aria-expanded="{% if forloop.counter == 1 %}true{% else %}false{% endif %}" aria-controls="dash-collapse-{{ forloop.counter }}" style="font-size: 13px;">
+                            <div class="d-flex justify-content-between align-items-center w-100 me-3">
+                                <div>
+                                    <i class="bi bi-folder-fill text-warning me-2"></i>
+                                    <strong>{{ db.group.name }}</strong>
+                                </div>
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="fw-bold">
+                                        {% if db.net > 0 %}
+                                            <span class="text-success">+₹{{ db.net|floatformat:2 }}</span>
+                                        {% elif db.net < 0 %}
+                                            <span class="text-danger">-₹{{ db.net|absolute|floatformat:2 }}</span>
+                                        {% else %}
+                                            <span class="text-secondary">₹0.00</span>
+                                        {% endif %}
+                                    </div>
+                                    <i class="bi bi-chevron-down text-secondary small" style="font-size: 11px;"></i>
+                                </div>
+                            </div>
+                        </button>
+                    </h2>
+                    <div id="dash-collapse-{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.counter == 1 %}show{% endif %}" aria-labelledby="dash-heading-{{ forloop.counter }}" data-bs-parent="#dashboardDebtsAccordion">
+                        <div class="accordion-body bg-white p-3">
+                            <!-- Outgoing Payments in this group -->
+                            {% if db.owes %}
+                            <div class="mb-3">
+                                <div class="fw-bold text-secondary mb-2" style="font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase;">
+                                    Who you owe in this group:
+                                </div>
+                                {% for simp in db.owes %}
+                                <div class="border border-light-subtle rounded p-2 mb-2 bg-light-subtle">
+                                    <div class="d-flex justify-content-between align-items-center mb-1 font-monospace">
+                                        <span class="small text-secondary">You owe <strong>{{ simp.to.name }}</strong></span>
+                                        <span class="fw-bold text-danger small">₹{{ simp.amount|floatformat:2 }}</span>
+                                    </div>
+                                    <!-- Itemized splits contributing between these two -->
+                                    <div class="border-top pt-1 mt-1 font-monospace" style="font-size: 11px;">
+                                        {% for detail in simp.details %}
+                                        <div class="d-flex justify-content-between text-secondary py-1">
+                                            <span class="text-truncate" style="max-width: 320px;">
+                                                {{ detail.date|date:"Y-m-d" }} &bull; {{ detail.description }} 
+                                                <span class="badge bg-light text-secondary border ms-1" style="font-size: 8.5px;">{{ detail.type }}</span>
+                                            </span>
+                                            <span class="{% if detail.sign == '+' %}text-danger{% else %}text-success{% endif %}">{{ detail.sign }}₹{{ detail.amount|floatformat:2 }}</span>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+
+                            <!-- Incoming Payments in this group -->
+                            {% if db.owed_by %}
+                            <div class="mb-3">
+                                <div class="fw-bold text-secondary mb-2" style="font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase;">
+                                    Who owes you in this group:
+                                </div>
+                                {% for simp in db.owed_by %}
+                                <div class="border border-light-subtle rounded p-2 mb-2 bg-light-subtle">
+                                    <div class="d-flex justify-content-between align-items-center mb-1 font-monospace">
+                                        <span class="small text-secondary"><strong>{{ simp.from.name }}</strong> owes you</span>
+                                        <span class="fw-bold text-success small">₹{{ simp.amount|floatformat:2 }}</span>
+                                    </div>
+                                    <!-- Itemized splits contributing between these two -->
+                                    <div class="border-top pt-1 mt-1 font-monospace" style="font-size: 11px;">
+                                        {% for detail in simp.details %}
+                                        <div class="d-flex justify-content-between text-secondary py-1">
+                                            <span class="text-truncate" style="max-width: 320px;">
+                                                {{ detail.date|date:"Y-m-d" }} &bull; {{ detail.description }} 
+                                                <span class="badge bg-light text-secondary border ms-1" style="font-size: 8.5px;">{{ detail.type }}</span>
+                                            </span>
+                                            <span class="{% if detail.sign == '+' %}text-danger{% else %}text-success{% endif %}">{{ detail.sign }}₹{{ detail.amount|floatformat:2 }}</span>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+
+                            {% if not db.owes and not db.owed_by %}
+                            <div class="text-center text-muted py-2 small">
+                                <i class="bi bi-check-circle-fill text-success me-1"></i> All debts are fully settled in this group!
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center text-muted py-4 small">
+                    <i class="bi bi-wallet2 fs-3 d-block mb-2 text-secondary"></i>
+                    You have no debts or receivables in any of your groups.
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
         <!-- Budgets / Active Groups Section -->
         <div class="row g-3 mb-4">
             <div class="col-12 d-flex justify-content-between align-items-center">
@@ -213,8 +349,9 @@
                 <table class="table align-middle table-hover">
                     <thead>
                         <tr style="border-bottom: 2px solid var(--border-color);">
-                            <th class="py-2" style="font-size: 11px; text-transform: uppercase;">Company</th>
-                            <th class="py-2" style="font-size: 11px; text-transform: uppercase;">Budget</th>
+                            <th class="py-2" style="font-size: 11px; text-transform: uppercase;">Expense</th>
+                            <th class="py-2" style="font-size: 11px; text-transform: uppercase;">Group</th>
+                            <th class="py-2" style="font-size: 11px; text-transform: uppercase;">Shared With</th>
                             <th class="py-2" style="font-size: 11px; text-transform: uppercase;">Date</th>
                             <th class="py-2 text-end" style="font-size: 11px; text-transform: uppercase;">Amount</th>
                             <th class="py-2 text-center" style="font-size: 11px; text-transform: uppercase; width: 120px;">Status</th>
@@ -231,6 +368,15 @@
                             </td>
                             <td>
                                 <span class="badge bg-light text-dark border small">{{ exp.group.name }}</span>
+                            </td>
+                            <td>
+                                <div class="text-secondary small">
+                                    {% for split in exp.splits.all %}
+                                        <span class="badge badge-member small" style="font-size: 10px;">{{ split.participant.name }}</span>
+                                    {% empty %}
+                                        <span class="text-muted italic small">No splits</span>
+                                    {% endfor %}
+                                </div>
                             </td>
                             <td class="text-secondary small font-monospace">{{ exp.expense_date|date:"Y-m-d" }}</td>
                             <td class="text-end fw-bold font-monospace text-dark" style="font-size: 13px;">₹{{ exp.amount|floatformat:2 }}</td>
@@ -251,7 +397,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="5" class="text-center text-muted py-5 small">
+                            <td colspan="6" class="text-center text-muted py-5 small">
                                 <i class="bi bi-receipt fs-2 d-block mb-2 text-secondary"></i>
                                 No expenses logged yet.
                             </td>

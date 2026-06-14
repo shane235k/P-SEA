@@ -4,7 +4,7 @@ from expense_manager.apps.expenses.models import Expense, ExpenseSplit
 from expense_manager.apps.settlements.models import Settlement
 from .split_calculator import round_half_up
 
-def get_group_balances(group):
+def get_group_balances(group, simplify=True):
     """
     Computes net balances and explanations for all participants in a group.
     Returns:
@@ -113,52 +113,160 @@ def get_group_balances(group):
         # Net = Paid - Owed + Settled_Paid - Settled_Received
         bal['net'] = bal['paid'] - bal['owed'] + bal['settled_paid'] - bal['settled_received']
         
-    # Debt Simplification
-    # Separate into creditors (net > 0) and debtors (net < 0)
-    creditors = []
-    debtors = []
-    
-    for p_id, bal in balances.items():
-        net = bal['net']
-        if net > Decimal('0.005'):
-            creditors.append({'participant': bal['participant'], 'amount': net})
-        elif net < Decimal('-0.005'):
-            debtors.append({'participant': bal['participant'], 'amount': -net}) # Store as positive number for matching
-            
-    # Sort creditors descending, debtors descending
-    creditors.sort(key=lambda x: x['amount'], reverse=True)
-    debtors.sort(key=lambda x: x['amount'], reverse=True)
-    
     simplifications = []
     
-    c_idx = 0
-    d_idx = 0
-    
-    while c_idx < len(creditors) and d_idx < len(debtors):
-        creditor = creditors[c_idx]
-        debtor = debtors[d_idx]
+    if simplify:
+        # Debt Simplification
+        # Separate into creditors (net > 0) and debtors (net < 0)
+        creditors = []
+        debtors = []
         
-        c_amt = creditor['amount']
-        d_amt = debtor['amount']
+        for p_id, bal in balances.items():
+            net = bal['net']
+            if net > Decimal('0.005'):
+                creditors.append({'participant': bal['participant'], 'amount': net})
+            elif net < Decimal('-0.005'):
+                debtors.append({'participant': bal['participant'], 'amount': -net}) # Store as positive number for matching
+                
+        # Sort creditors descending, debtors descending
+        creditors.sort(key=lambda x: x['amount'], reverse=True)
+        debtors.sort(key=lambda x: x['amount'], reverse=True)
         
-        transfer_amt = min(c_amt, d_amt)
-        transfer_amt = round_half_up(transfer_amt)
+        c_idx = 0
+        d_idx = 0
         
-        if transfer_amt > 0:
-            simplifications.append({
-                'from': debtor['participant'],
-                'to': creditor['participant'],
-                'amount': transfer_amt
-            })
+        while c_idx < len(creditors) and d_idx < len(debtors):
+            creditor = creditors[c_idx]
+            debtor = debtors[d_idx]
             
-        creditor['amount'] -= transfer_amt
-        debtor['amount'] -= transfer_amt
-        
-        if creditor['amount'] < Decimal('0.005'):
-            c_idx += 1
-        if debtor['amount'] < Decimal('0.005'):
-            d_idx += 1
+            c_amt = creditor['amount']
+            d_amt = debtor['amount']
             
+            transfer_amt = min(c_amt, d_amt)
+            transfer_amt = round_half_up(transfer_amt)
+            
+            if transfer_amt > 0:
+                simplifications.append({
+                    'from': debtor['participant'],
+                    'to': creditor['participant'],
+                    'amount': transfer_amt
+                })
+                
+            creditor['amount'] -= transfer_amt
+            debtor['amount'] -= transfer_amt
+            
+            if creditor['amount'] < Decimal('0.005'):
+                c_idx += 1
+            if debtor['amount'] < Decimal('0.005'):
+                d_idx += 1
+    else:
+        # Direct Debts
+        # For each pair of participants (debtor, creditor):
+        # debtor owes creditor net split share minus peer-to-peer settlements
+        direct_balances = {} # {(debtor_id, creditor_id): amount}
+        
+        # 1. Accumulate split obligations
+        for exp in expenses:
+            payer = exp.paid_by
+            for split in exp.splits.all():
+                debtor = split.participant
+                if debtor.id != payer.id:
+                    pair = (debtor.id, payer.id)
+                    direct_balances[pair] = direct_balances.get(pair, Decimal('0.00')) + split.share_amount
+                    
+        # 2. Subtract settlements
+        for setl in settlements:
+            payer = setl.payer
+            receiver = setl.receiver
+            pair = (payer.id, receiver.id)
+            direct_balances[pair] = direct_balances.get(pair, Decimal('0.00')) - setl.amount
+            
+        # 3. Net out mutual debts (A owes B and B owes A)
+        participant_ids = list(balances.keys())
+        for i in range(len(participant_ids)):
+            for j in range(i + 1, len(participant_ids)):
+                id1 = participant_ids[i]
+                id2 = participant_ids[j]
+                
+                bal1 = direct_balances.get((id1, id2), Decimal('0.00'))
+                bal2 = direct_balances.get((id2, id1), Decimal('0.00'))
+                
+                if bal1 > 0 and bal2 > 0:
+                    if bal1 > bal2:
+                        direct_balances[(id1, id2)] = bal1 - bal2
+                        direct_balances[(id2, id1)] = Decimal('0.00')
+                    else:
+                        direct_balances[(id2, id1)] = bal2 - bal1
+                        direct_balances[(id1, id2)] = Decimal('0.00')
+                elif bal1 < 0:
+                    direct_balances[(id2, id1)] = direct_balances.get((id2, id1), Decimal('0.00')) + (-bal1)
+                    direct_balances[(id1, id2)] = Decimal('0.00')
+                elif bal2 < 0:
+                    direct_balances[(id1, id2)] = direct_balances.get((id1, id2), Decimal('0.00')) + (-bal2)
+                    direct_balances[(id2, id1)] = Decimal('0.00')
+
+        # 4. Filter only positive debt transfers
+        p_map = {p.id: p for p in participants}
+        for (debtor_id, creditor_id), amt in direct_balances.items():
+            amt = round_half_up(amt)
+            if amt > Decimal('0.005'):
+                simplifications.append({
+                    'from': p_map[debtor_id],
+                    'to': p_map[creditor_id],
+                    'amount': amt
+                })
+            
+    # Populate itemized transactions details for each transfer relationship
+    for simp in simplifications:
+        d_id = simp['from'].id
+        c_id = simp['to'].id
+        details_list = []
+        
+        # 1. Shared Splits
+        for exp in expenses:
+            if exp.paid_by.id == c_id:
+                for split in exp.splits.all():
+                    if split.participant.id == d_id:
+                        details_list.append({
+                            'date': exp.expense_date,
+                            'description': exp.description,
+                            'amount': split.share_amount,
+                            'type': 'Split Share',
+                            'sign': '+'
+                        })
+            elif exp.paid_by.id == d_id:
+                for split in exp.splits.all():
+                    if split.participant.id == c_id:
+                        details_list.append({
+                            'date': exp.expense_date,
+                            'description': exp.description,
+                            'amount': split.share_amount,
+                            'type': 'Split Share',
+                            'sign': '-'
+                        })
+                        
+        # 2. Settlements
+        for setl in settlements:
+            if setl.payer.id == d_id and setl.receiver.id == c_id:
+                details_list.append({
+                    'date': setl.date,
+                    'description': 'Peer Settlement',
+                    'amount': setl.amount,
+                    'type': 'Settlement',
+                    'sign': '-'
+                })
+            elif setl.payer.id == c_id and setl.receiver.id == d_id:
+                details_list.append({
+                    'date': setl.date,
+                    'description': 'Peer Settlement',
+                    'amount': setl.amount,
+                    'type': 'Settlement',
+                    'sign': '+'
+                })
+                
+        details_list.sort(key=lambda x: x['date'])
+        simp['details'] = details_list
+
     # Sort explanations by date
     for p_id in explanations:
         explanations[p_id].sort(key=lambda x: x['date'])
