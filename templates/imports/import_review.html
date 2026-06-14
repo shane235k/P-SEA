@@ -136,29 +136,25 @@
                                         <strong>Policy:</strong> {{ anom.suggested_fix }}
                                     </div>
                                     {% if anom.type == 'DUPLICATE_ENTRY' and anom.decision == 'PENDING' %}
-                                    <form method="POST" action="{% url 'resolve_duplicate' session.id row.id %}" class="d-block mt-2 pt-2 border-top">
+                                    <form method="POST" action="{% url 'resolve_duplicate' session.id row.id %}" class="d-block mt-2 pt-2 border-top text-end">
                                         {% csrf_token %}
-                                        <div class="btn-group btn-group-sm w-100">
-                                            <button type="submit" name="resolution" value="duplicate" class="btn btn-danger btn-sm py-1" style="font-size: 10px;">
-                                                <i class="bi bi-trash"></i> Reject Duplicate
-                                            </button>
-                                            <button type="submit" name="resolution" value="separate" class="btn btn-success btn-sm py-1" style="font-size: 10px;">
-                                                <i class="bi bi-check-circle"></i> Keep Separate
-                                            </button>
-                                        </div>
+                                        <button type="submit" name="resolution" value="duplicate" class="btn btn-outline-danger btn-sm py-0.5 px-2 font-monospace" style="font-size: 10px;">
+                                            <i class="bi bi-trash"></i> Reject Duplicate
+                                        </button>
+                                        <button type="submit" name="resolution" value="separate" class="btn btn-outline-secondary btn-sm py-0.5 px-2 font-monospace ms-1" style="font-size: 10px;">
+                                            <i class="bi bi-check-circle"></i> Keep Separate
+                                        </button>
                                     </form>
                                     {% endif %}
                                     {% if anom.type == 'ALIAS_MAPPING' and anom.decision == 'PENDING' %}
-                                    <form method="POST" action="{% url 'resolve_alias' session.id row.id %}" class="d-block mt-2 pt-2 border-top">
+                                    <form method="POST" action="{% url 'resolve_alias' session.id row.id %}" class="d-block mt-2 pt-2 border-top text-end">
                                         {% csrf_token %}
-                                        <div class="btn-group btn-group-sm w-100">
-                                            <button type="submit" name="resolution" value="map" class="btn btn-success btn-sm py-1" style="font-size: 10px;">
-                                                <i class="bi bi-person-check-fill"></i> Map to User
-                                            </button>
-                                            <button type="submit" name="resolution" value="create" class="btn btn-primary btn-sm py-1" style="font-size: 10px;">
-                                                <i class="bi bi-person-plus-fill"></i> Keep Name
-                                            </button>
-                                        </div>
+                                        <button type="submit" name="resolution" value="map" class="btn btn-outline-success btn-sm py-0.5 px-2 font-monospace" style="font-size: 10px;">
+                                            <i class="bi bi-person-check-fill"></i> Map to User
+                                        </button>
+                                        <button type="submit" name="resolution" value="create" class="btn btn-outline-secondary btn-sm py-0.5 px-2 font-monospace ms-1" style="font-size: 10px;">
+                                            <i class="bi bi-person-plus-fill"></i> Keep Name
+                                        </button>
                                     </form>
                                     {% endif %}
                                 </div>
