@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block title %}Record Settlement - SplitAudit{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card glass-card p-4 border-0">
+            <h3 class="mb-3 text-dark"><i class="bi bi-cash-coin text-success me-2"></i> Record Peer Payment</h3>
+            <p class="text-secondary small">Record an actual monetary transfer between group participants to settle outstanding balances.</p>
+            
+            <form method="POST">
+                {% csrf_token %}
+                
+                <div class="mb-3">
+                    <label for="payer" class="form-label fw-semibold text-secondary">Payer (Who Paid)</label>
+                    <select class="form-select" id="payer" name="payer" required>
+                        {% for p in participants %}
+                        <option value="{{ p.id }}">{{ p.name }} {% if p.is_external %}(External){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label for="receiver" class="form-label fw-semibold text-secondary">Receiver (Who Received)</label>
+                    <select class="form-select" id="receiver" name="receiver" required>
+                        {% for p in participants %}
+                        <option value="{{ p.id }}">{{ p.name }} {% if p.is_external %}(External){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label for="amount" class="form-label fw-semibold text-secondary">Amount (INR)</label>
+                    <input type="number" step="0.01" class="form-control font-monospace" id="amount" name="amount" placeholder="0.00" required>
+                </div>
+
+                <div class="mb-3">
+                    <label for="date" class="form-label fw-semibold text-secondary">Payment Date</label>
+                    <input type="date" class="form-control" id="date" name="date" value="{{ default_date }}" required>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-success px-4">
+                        <i class="bi bi-check-lg"></i> Record Payment
+                    </button>
+                    <a href="{% url 'group_detail' group.id %}" class="btn btn-outline-secondary">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit Row {{ row.row_number }} - SplitAudit{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-1">
+                <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'group_detail' session.group.id %}">{{ session.group.name }}</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'import_review' session.id %}">Audit Import</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Edit Row {{ row.row_number }}</li>
+            </ol>
+        </nav>
+        
+        <div class="card glass-card p-4 border-0">
+            <h3 class="mb-3 text-dark"><i class="bi bi-pencil-square text-primary"></i> Edit Staging Row #{{ row.row_number }}</h3>
+            <p class="text-secondary small">Modify values for this row to resolve anomalies. Original raw import data is preserved for audit trails.</p>
+            
+            <form method="POST">
+                {% csrf_token %}
+                
+                <div class="row bg-light p-3 rounded mb-4 border text-secondary small font-monospace">
+                    <div class="col-md-6">
+                        <strong>Raw CSV Date:</strong> <code>{{ row.date }}</code><br>
+                        <strong>Raw CSV Desc:</strong> <code>{{ row.description }}</code><br>
+                        <strong>Raw CSV Payer:</strong> <code>{{ row.paid_by }}</code>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Raw CSV Amount:</strong> <code>{{ row.amount }} {{ row.currency }}</code><br>
+                        <strong>Raw CSV Split With:</strong> <code>{{ row.split_with }}</code><br>
+                        <strong>Raw CSV Split Type:</strong> <code>{{ row.split_type }}</code>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="date" class="form-label fw-semibold text-secondary">Date (YYYY-MM-DD)</label>
+                        <input type="date" class="form-control font-monospace" id="date" name="date" 
+                               value="{% if row.resolved_date %}{{ row.resolved_date|date:'Y-m-d' }}{% endif %}" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="description" class="form-label fw-semibold text-secondary">Description</label>
+                        <input type="text" class="form-control" id="description" name="description" value="{{ row.resolved_description|default:'' }}" required>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="paid_by" class="form-label fw-semibold text-secondary">Paid By (Payer Name)</label>
+                        <input type="text" class="form-control" id="paid_by" name="paid_by" value="{{ row.resolved_paid_by_name|default:'' }}" placeholder="Payer Name" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="amount" class="form-label fw-semibold text-secondary">Amount (Local Currency - INR)</label>
+                        <input type="number" step="0.01" class="form-control font-monospace" id="amount" name="amount" 
+                               value="{% if row.resolved_amount is not None %}{{ row.resolved_amount|stringformat:'.2f' }}{% endif %}" required>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="currency" class="form-label fw-semibold text-secondary">Currency</label>
+                        <input type="text" class="form-control font-monospace" id="currency" name="currency" value="{{ row.resolved_currency|default:'INR' }}" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="split_type" class="form-label fw-semibold text-secondary">Split Type</label>
+                        <select class="form-select" id="split_type" name="split_type" required>
+                            <option value="EQUAL" {% if row.resolved_split_type == 'EQUAL' %}selected{% endif %}>Equal</option>
+                            <option value="PERCENTAGE" {% if row.resolved_split_type == 'PERCENTAGE' %}selected{% endif %}>Percentage</option>
+                            <option value="SHARES" {% if row.resolved_split_type == 'SHARES' %}selected{% endif %}>Shares</option>
+                            <option value="EXACT" {% if row.resolved_split_type == 'EXACT' %}selected{% endif %}>Exact Amount</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="split_with" class="form-label fw-semibold text-secondary">Split With (Semicolon Separated Names)</label>
+                    <input type="text" class="form-control" id="split_with" name="split_with" value="{{ row.resolved_split_with|default:'' }}" placeholder="Aisha; Rohan; Priya; Meera" required>
+                </div>
+
+                <div class="mb-3">
+                    <label for="split_details" class="form-label fw-semibold text-secondary">Split Details (Percentages/Shares/Exact Amounts)</label>
+                    <input type="text" class="form-control font-monospace" id="split_details" name="split_details" value="{{ row.resolved_split_details|default:'' }}" placeholder="e.g. Rohan 700; Priya 400; Meera 400">
+                </div>
+
+                <div class="mb-3">
+                    <label for="notes" class="form-label fw-semibold text-secondary">Notes</label>
+                    <textarea class="form-control" id="notes" name="notes" rows="2">{{ row.resolved_notes|default:'' }}</textarea>
+                </div>
+
+                <div class="mb-4">
+                    <div class="form-check form-switch bg-light p-3 border rounded">
+                        <input class="form-check-input ms-0 me-2" type="checkbox" role="switch" id="is_settlement" name="is_settlement" {% if row.is_settlement %}checked{% endif %}>
+                        <label class="form-check-label text-dark fw-bold" for="is_settlement">Convert to peer settlement payment</label>
+                        <div class="form-text small text-secondary">Check this if the transaction is a peer settlement (e.g. paid back, settled, deposit) rather than a shared group expense.</div>
+                    </div>
+                </div>
+
+                {% if has_duplicate_anomaly %}
+                <div class="mb-4">
+                    <div class="bg-light p-3 border rounded">
+                        <label for="duplicate_action" class="form-label fw-bold text-dark"><i class="bi bi-exclamation-triangle-fill text-warning me-1"></i> Duplicate Detection Resolution</label>
+                        <select class="form-select" id="duplicate_action" name="duplicate_action">
+                            <option value="separate" {% if duplicate_decision == 'APPROVED' %}selected{% endif %}>No, this is a separate transaction (keep it)</option>
+                            <option value="duplicate" {% if row.status == 'REJECTED' or duplicate_decision == 'REJECTED' %}selected{% endif %}>Yes, this is a duplicate (reject/exclude this row)</option>
+                        </select>
+                        <div class="form-text small text-secondary">Flag this row if it is a duplicate of another transaction in this session or in the group history. Rejection excludes it from import.</div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary-grad px-4">
+                        <i class="bi bi-check-lg"></i> Save & Recalculate
+                    </button>
+                    <a href="{% url 'import_review' session.id %}" class="btn btn-outline-secondary">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

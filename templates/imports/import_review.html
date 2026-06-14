@@ -1,0 +1,192 @@
+{% extends 'base.html' %}
+
+{% block title %}Audit CSV Import - SplitAudit{% endblock %}
+
+{% block content %}
+<div class="row align-items-center mb-4">
+    <div class="col-md-7">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-1">
+                <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'group_detail' session.group.id %}">{{ session.group.name }}</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Audit Import</li>
+            </ol>
+        </nav>
+        <h1 class="text-dark"><i class="bi bi-shield-fill-check text-primary"></i> Audit Import Session #{{ session.id }}</h1>
+        <p class="text-muted small">File: <code>{{ session.file_name }}</code> &bull; Staged by {{ session.uploaded_by.name }} on {{ session.created_at }}</p>
+    </div>
+    
+    <div class="col-md-5 text-md-end mt-3 mt-md-0">
+        {% if unresolved_errors_count > 0 %}
+        <div class="alert alert-danger d-inline-block text-start py-2 px-3 mb-0 border-0 small shadow-sm">
+            <i class="bi bi-exclamation-octagon-fill me-1"></i>
+            <strong>Blockers Active:</strong> You have <strong>{{ unresolved_errors_count }}</strong> unresolved error(s). Finalization is blocked.
+        </div>
+        <button class="btn btn-primary-grad px-4 ms-2" disabled>
+            <i class="bi bi-check-all"></i> Finalize Import
+        </button>
+        {% else %}
+        <div class="alert alert-success d-inline-block text-start py-2 px-3 mb-0 border-0 small shadow-sm">
+            <i class="bi bi-check-circle-fill me-1"></i>
+            All blockers resolved! You can now commit this import.
+        </div>
+        <form method="POST" action="{% url 'finalize_import' session.id %}" class="d-inline-block ms-2">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-success fw-bold px-4">
+                <i class="bi bi-check-all"></i> Finalize & Commit
+            </button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Rows & Anomalies Audit Board -->
+<div class="row">
+    <div class="col-12">
+        <div class="card glass-card border-0 p-4">
+            <h4 class="mb-3 text-dark"><i class="bi bi-list-ol"></i> Staging Ledger</h4>
+            
+            <div class="table-responsive">
+                <table class="table table-bordered align-middle small">
+                    <thead class="table-light">
+                        <tr class="text-secondary uppercase font-monospace" style="font-size: 11px;">
+                            <th style="width: 50px;">Line</th>
+                            <th style="width: 150px;">Date & Description</th>
+                            <th style="width: 120px;">Payer & Amount</th>
+                            <th style="width: 160px;">Split Layout</th>
+                            <th>Flagged Anomalies & Audit Details</th>
+                            <th style="width: 100px;">Status</th>
+                            <th style="width: 150px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in rows %}
+                        <tr class="{% if row.status == 'REJECTED' %}table-danger-subtle opacity-75{% elif row.status == 'RESOLVED' and not row.anomalies.all %}table-success-subtle{% endif %}">
+                            <!-- Line Number -->
+                            <td class="text-center font-monospace fw-bold">{{ row.row_number }}</td>
+                            
+                            <!-- Date & Description -->
+                            <td>
+                                <div class="mb-1">
+                                    <span class="text-muted small uppercase font-monospace">CSV:</span> <code>{{ row.date }}</code>
+                                    {% if row.resolved_date %}
+                                    <br><span class="text-success font-monospace fw-semibold">&rarr; {{ row.resolved_date }}</span>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <span class="text-muted small uppercase font-monospace">Desc:</span> <em>{{ row.description }}</em>
+                                    {% if row.resolved_description != row.description %}
+                                    <br><span class="text-success fw-semibold">&rarr; {{ row.resolved_description }}</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            
+                            <!-- Payer & Amount -->
+                            <td>
+                                <div class="mb-1">
+                                    <span class="text-muted small uppercase font-monospace">Paid:</span> <code>{{ row.paid_by }}</code>
+                                    {% if row.resolved_paid_by_name %}
+                                    <br><span class="text-success font-monospace fw-semibold">&rarr; {{ row.resolved_paid_by_name }}</span>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <span class="text-muted small uppercase font-monospace">Amt:</span> <code>{{ row.amount }} {{ row.currency }}</code>
+                                    {% if row.resolved_amount is not None %}
+                                    <br><span class="text-success font-monospace fw-semibold">&rarr; ₹{{ row.resolved_amount|floatformat:2 }}</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            
+                            <!-- Split Layout -->
+                            <td>
+                                <div class="mb-1">
+                                    <span class="text-muted small uppercase font-monospace">Type:</span> <code>{{ row.split_type }}</code>
+                                    {% if row.resolved_split_type %}
+                                    <br><span class="text-success font-monospace fw-semibold">&rarr; {{ row.resolved_split_type }}</span>
+                                    {% endif %}
+                                </div>
+                                <div class="mb-1">
+                                    <span class="text-muted small uppercase font-monospace">With:</span> <span class="small text-muted">{{ row.split_with }}</span>
+                                    {% if row.resolved_split_with != row.split_with %}
+                                    <br><span class="text-success small">&rarr; {{ row.resolved_split_with }}</span>
+                                    {% endif %}
+                                </div>
+                                {% if row.split_details %}
+                                <div>
+                                    <span class="text-muted small uppercase font-monospace">Details:</span> <span class="small font-monospace">{{ row.split_details }}</span>
+                                </div>
+                                {% endif %}
+                                {% if row.is_settlement %}
+                                <span class="badge bg-success mt-1"><i class="bi bi-arrow-repeat"></i> Convert to Settlement</span>
+                                {% endif %}
+                            </td>
+                            
+                            <!-- Flagged Anomalies -->
+                            <td>
+                                {% for anom in row.anomalies.all %}
+                                <div class="p-2 border rounded mb-1 {% if anom.severity == 'ERROR' %}bg-danger-subtle border-danger-subtle text-danger-emphasis{% elif anom.severity == 'WARNING' %}bg-warning-subtle border-warning-subtle text-warning-emphasis{% else %}bg-info-subtle border-info-subtle text-info-emphasis{% endif %}">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <strong style="font-size: 11px;"><i class="bi bi-info-circle-fill"></i> {{ anom.type }}</strong>
+                                        <span class="badge {% if anom.severity == 'ERROR' %}bg-danger{% elif anom.severity == 'WARNING' %}bg-warning text-dark{% else %}bg-info{% endif %} small" style="font-size: 9px;">
+                                            {{ anom.severity }}
+                                        </span>
+                                    </div>
+                                    <div class="small mt-1" style="font-size: 11px;">
+                                        <strong>Raw value:</strong> <code>{{ anom.raw_value }}</code><br>
+                                        <strong>Policy:</strong> {{ anom.suggested_fix }}
+                                    </div>
+                                    {% if anom.type == 'DUPLICATE_ENTRY' and anom.decision == 'PENDING' %}
+                                    <form method="POST" action="{% url 'resolve_duplicate' session.id row.id %}" class="d-block mt-2 pt-2 border-top">
+                                        {% csrf_token %}
+                                        <div class="btn-group btn-group-sm w-100">
+                                            <button type="submit" name="resolution" value="duplicate" class="btn btn-danger btn-sm py-1" style="font-size: 10px;">
+                                                <i class="bi bi-trash"></i> Reject Duplicate
+                                            </button>
+                                            <button type="submit" name="resolution" value="separate" class="btn btn-success btn-sm py-1" style="font-size: 10px;">
+                                                <i class="bi bi-check-circle"></i> Keep Separate
+                                            </button>
+                                        </div>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                                {% empty %}
+                                <span class="text-success small"><i class="bi bi-shield-check"></i> Clean Row</span>
+                                {% endfor %}
+                            </td>
+                            
+                            <!-- Status -->
+                            <td>
+                                <span class="badge {% if row.status == 'RESOLVED' %}bg-success-subtle text-success{% elif row.status == 'REJECTED' %}bg-danger-subtle text-danger{% else %}bg-warning-subtle text-warning{% endif %}">
+                                    {{ row.get_status_display }}
+                                </span>
+                            </td>
+                            
+                            <!-- Actions -->
+                            <td>
+                                <div class="d-flex flex-column gap-1">
+                                    {% if row.status != 'REJECTED' %}
+                                    <a href="{% url 'approve_row' session.id row.id %}" class="btn btn-outline-success btn-sm py-1">
+                                        <i class="bi bi-check-lg"></i> Approve
+                                    </a>
+                                    {% endif %}
+                                    
+                                    <a href="{% url 'edit_row' session.id row.id %}" class="btn btn-outline-primary btn-sm py-1">
+                                        <i class="bi bi-pencil-square"></i> Edit Cell
+                                    </a>
+                                    
+                                    {% if row.status != 'REJECTED' %}
+                                    <a href="{% url 'reject_row' session.id row.id %}" class="btn btn-outline-danger btn-sm py-1">
+                                        <i class="bi bi-x-circle"></i> Reject Row
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

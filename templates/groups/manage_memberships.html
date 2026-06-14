@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+
+{% block title %}Manage Memberships - {{ group.name }}{% endblock %}
+
+{% block content %}
+<div class="row align-items-center mb-4">
+    <div class="col-md-8">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-1">
+                <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'group_detail' group.id %}">{{ group.name }}</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Memberships</li>
+            </ol>
+        </nav>
+        <h1 class="text-dark"><i class="bi bi-person-gear text-primary"></i> Manage Memberships: {{ group.name }}</h1>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Left Column: Current Memberships & Exit Control -->
+    <div class="col-lg-7 mb-4">
+        <div class="card glass-card border-0 p-4">
+            <h4 class="mb-3 text-dark"><i class="bi bi-people-fill text-primary"></i> Active & Past Group Members</h4>
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Member</th>
+                            <th>Joined On</th>
+                            <th>Left On</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in memberships %}
+                        <tr>
+                            <td>
+                                <div class="fw-semibold">{{ m.user.name }}</div>
+                                <span class="small text-muted">{{ m.user.email }}</span>
+                            </td>
+                            <td class="font-monospace small">{{ m.joined_at }}</td>
+                            <td class="font-monospace small text-danger">
+                                {% if m.left_at %}
+                                    {{ m.left_at }}
+                                {% else %}
+                                    <span class="text-success fw-normal">Active</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if not m.left_at %}
+                                <form method="POST" class="d-flex align-items-center gap-1" style="max-width: 200px;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="leave">
+                                    <input type="hidden" name="membership_id" value="{{ m.id }}">
+                                    <input type="date" class="form-control form-control-sm" name="left_at" value="{{ default_date }}" required>
+                                    <button type="submit" class="btn btn-outline-danger btn-sm">Leave</button>
+                                </form>
+                                {% else %}
+                                <span class="text-muted small">Departed</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Add New Member -->
+    <div class="col-lg-5">
+        <div class="card glass-card border-0 p-4">
+            <h4 class="mb-3 text-dark"><i class="bi bi-person-plus-fill text-success"></i> Add Member to Group</h4>
+            <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add">
+                
+                <div class="mb-3">
+                    <label for="user_id" class="form-label fw-semibold text-secondary">Select User</label>
+                    <select class="form-select" id="user_id" name="user_id" required>
+                        <option value="">-- Choose User --</option>
+                        {% for u in users %}
+                        <option value="{{ u.id }}">{{ u.name }} ({{ u.email }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label for="joined_at" class="form-label fw-semibold text-secondary">Join Date</label>
+                    <input type="date" class="form-control" id="joined_at" name="joined_at" value="{{ default_date }}" required>
+                </div>
+
+                <div class="mb-3">
+                    <label for="role" class="form-label fw-semibold text-secondary">Group Role</label>
+                    <select class="form-select" id="role" name="role" required>
+                        <option value="MEMBER">Member</option>
+                        <option value="ADMIN">Group Admin</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn btn-primary-grad w-100 py-2">
+                    <i class="bi bi-plus-lg"></i> Add to Group
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

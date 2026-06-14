@@ -1,0 +1,214 @@
+{% extends 'base.html' %}
+{% load custom_filters %}
+
+{% block title %}Dashboard - SplitAudit{% endblock %}
+
+{% block content %}
+<div class="row mb-4 animate__animated animate__fadeIn">
+    <!-- Balance Header Card -->
+    <div class="col-md-12 mb-4">
+        <div class="card border-0 text-white p-4 shadow-sm" style="background: var(--primary-gradient); border-radius: 20px;">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <p class="text-white-50 mb-1 fw-medium uppercase small" style="letter-spacing: 1px;">AGGREGATE NET POSITION</p>
+                    <h1 class="display-4 fw-bold mb-0">
+                        {% if total_net_balance >= 0 %}
+                            +₹{{ total_net_balance|floatformat:2 }}
+                        {% else %}
+                            -₹{{ total_net_balance|absolute|floatformat:2 }}
+                        {% endif %}
+                    </h1>
+                    <p class="mb-0 mt-2 text-white-50 small">Computed dynamically across all groups respecting joined/left member dates.</p>
+                </div>
+                <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                    {% if user.role == 'ADMIN' %}
+                    <a href="{% url 'create_group' %}" class="btn btn-light btn-lg text-primary fw-bold rounded-pill shadow-sm px-4">
+                        <i class="bi bi-plus-circle-fill me-1"></i> Create Group
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Left Column: Balances Breakdown -->
+    <div class="col-lg-4 mb-4">
+        <!-- Groups list -->
+        <div class="card glass-card border-0 p-4 mb-4">
+            <h4 class="mb-3 text-dark d-flex align-items-center">
+                <i class="bi bi-people-fill text-primary me-2"></i> My Groups
+            </h4>
+            <div class="list-group list-group-flush">
+                {% for group in all_groups %}
+                <a href="{% url 'group_detail' group.id %}" class="list-group-item list-group-item-action border-0 px-0 d-flex justify-content-between align-items-center py-3">
+                    <div class="fw-semibold text-dark">
+                        <i class="bi bi-folder-fill text-warning me-2"></i> {{ group.name }}
+                    </div>
+                    <i class="bi bi-chevron-right text-muted small"></i>
+                </a>
+                {% empty %}
+                <p class="text-secondary small">You are not a member of any groups yet.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Debt Simplification Summary -->
+        <div class="card glass-card border-0 p-4">
+            <h4 class="mb-3 text-dark"><i class="bi bi-arrow-left-right text-primary me-2"></i> Simplified Debts</h4>
+            
+            <h5 class="small fw-bold text-danger border-bottom pb-2 mb-2"><i class="bi bi-dash-circle"></i> YOU OWE</h5>
+            {% for person, amt in people_you_owe.items %}
+            <div class="d-flex justify-content-between align-items-center mb-2 font-monospace">
+                <span class="text-secondary">{{ person }}</span>
+                <span class="text-danger fw-bold">₹{{ amt|floatformat:2 }}</span>
+            </div>
+            {% empty %}
+            <p class="text-muted small">You owe nothing!</p>
+            {% endfor %}
+            
+            <h5 class="small fw-bold text-success border-bottom pb-2 mt-4 mb-2"><i class="bi bi-plus-circle"></i> OWES YOU</h5>
+            {% for person, amt in people_who_owe_you.items %}
+            <div class="d-flex justify-content-between align-items-center mb-2 font-monospace">
+                <span class="text-secondary">{{ person }}</span>
+                <span class="text-success fw-bold">₹{{ amt|floatformat:2 }}</span>
+            </div>
+            {% empty %}
+            <p class="text-muted small">No one owes you.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Right Column: Recent Activities -->
+    <div class="col-lg-8">
+        <!-- Recent Expenses -->
+        <div class="card glass-card border-0 p-4 mb-4">
+            <h4 class="mb-3 text-dark d-flex align-items-center">
+                <i class="bi bi-receipt-cutoff text-primary me-2"></i> Recent Expenses
+            </h4>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Description</th>
+                            <th>Group</th>
+                            <th>Paid By</th>
+                            <th class="text-end">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for exp in recent_expenses %}
+                        <tr>
+                            <td class="text-secondary small font-monospace">{{ exp.expense_date|date:"Y-m-d" }}</td>
+                            <td>
+                                <div class="fw-semibold">{{ exp.description }}</div>
+                                <span class="badge {% if exp.status == 'ACTIVE' %}bg-success-subtle text-success{% elif exp.status == 'DRAFT' %}bg-warning-subtle text-warning{% else %}bg-secondary-subtle text-secondary{% endif %} small">
+                                    {{ exp.status }}
+                                </span>
+                            </td>
+                            <td><span class="small text-muted">{{ exp.group.name }}</span></td>
+                            <td>{{ exp.paid_by.name }}</td>
+                            <td class="text-end fw-bold font-monospace">₹{{ exp.amount|floatformat:2 }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4 small">No expenses logged yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Recent Settlements -->
+        <div class="card glass-card border-0 p-4 mb-4">
+            <h4 class="mb-3 text-dark d-flex align-items-center">
+                <i class="bi bi-wallet2 text-success me-2"></i> Recent Settlements
+            </h4>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Group</th>
+                            <th>Payer</th>
+                            <th>Receiver</th>
+                            <th class="text-end">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for setl in recent_settlements %}
+                        <tr>
+                            <td class="text-secondary small font-monospace">{{ setl.date|date:"Y-m-d" }}</td>
+                            <td><span class="small text-muted">{{ setl.group.name }}</span></td>
+                            <td>{{ setl.payer.name }}</td>
+                            <td>{{ setl.receiver.name }}</td>
+                            <td class="text-end fw-bold font-monospace text-success">₹{{ setl.amount|floatformat:2 }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4 small">No settlements logged yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Import Sessions -->
+        <div class="card glass-card border-0 p-4">
+            <h4 class="mb-3 text-dark d-flex align-items-center">
+                <i class="bi bi-cloud-arrow-up-fill text-primary me-2"></i> Recent Import Uploads
+            </h4>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Group</th>
+                            <th>File Name</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sess in import_status %}
+                        <tr>
+                            <td class="text-secondary small font-monospace">{{ sess.created_at|date:"Y-m-d H:i" }}</td>
+                            <td>{{ sess.group.name }}</td>
+                            <td><span class="small">{{ sess.file_name }}</span></td>
+                            <td>
+                                <span class="badge {% if sess.status == 'IMPORTED' %}bg-success-subtle text-success{% elif sess.status == 'PENDING_REVIEW' %}bg-warning-subtle text-warning{% else %}bg-danger-subtle text-danger{% endif %}">
+                                    {{ sess.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if sess.status == 'PENDING_REVIEW' %}
+                                    {% if user.role == 'ADMIN' %}
+                                    <a href="{% url 'import_review' sess.id %}" class="btn btn-warning btn-sm fw-bold">
+                                        <i class="bi bi-search"></i> Review
+                                    </a>
+                                    {% else %}
+                                    <span class="small text-secondary">Awaiting Admin</span>
+                                    {% endif %}
+                                {% else %}
+                                <a href="{% url 'import_report' sess.id %}" class="btn btn-outline-secondary btn-sm">
+                                    <i class="bi bi-file-earmark-bar-graph"></i> Report
+                                </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4 small">No files imported yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
