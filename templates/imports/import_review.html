@@ -148,6 +148,19 @@
                                         </div>
                                     </form>
                                     {% endif %}
+                                    {% if anom.type == 'ALIAS_MAPPING' and anom.decision == 'PENDING' %}
+                                    <form method="POST" action="{% url 'resolve_alias' session.id row.id %}" class="d-block mt-2 pt-2 border-top">
+                                        {% csrf_token %}
+                                        <div class="btn-group btn-group-sm w-100">
+                                            <button type="submit" name="resolution" value="map" class="btn btn-success btn-sm py-1" style="font-size: 10px;">
+                                                <i class="bi bi-person-check-fill"></i> Map to User
+                                            </button>
+                                            <button type="submit" name="resolution" value="create" class="btn btn-primary btn-sm py-1" style="font-size: 10px;">
+                                                <i class="bi bi-person-plus-fill"></i> Keep Name
+                                            </button>
+                                        </div>
+                                    </form>
+                                    {% endif %}
                                 </div>
                                 {% empty %}
                                 <span class="text-success small"><i class="bi bi-shield-check"></i> Clean Row</span>

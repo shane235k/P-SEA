@@ -65,7 +65,10 @@
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <label for="currency" class="form-label fw-semibold text-secondary">Currency</label>
-                        <input type="text" class="form-control font-monospace" id="currency" name="currency" value="{{ row.resolved_currency|default:'INR' }}" required>
+                        <select class="form-select font-monospace" id="currency" name="currency" required>
+                            <option value="INR" {% if row.resolved_currency == 'INR' or not row.resolved_currency %}selected{% endif %}>INR</option>
+                            <option value="USD" {% if row.resolved_currency == 'USD' %}selected{% endif %}>USD</option>
+                        </select>
                     </div>
                     <div class="col-md-6 mb-3">
                         <label for="split_type" class="form-label fw-semibold text-secondary">Split Type</label>
@@ -100,6 +103,19 @@
                         <div class="form-text small text-secondary">Check this if the transaction is a peer settlement (e.g. paid back, settled, deposit) rather than a shared group expense.</div>
                     </div>
                 </div>
+
+                {% if has_alias_anomaly %}
+                <div class="mb-4">
+                    <div class="bg-light p-3 border rounded">
+                        <label for="alias_action" class="form-label fw-bold text-dark"><i class="bi bi-person-fill-exclamation text-warning me-1"></i> Name Alias Resolution</label>
+                        <select class="form-select" id="alias_action" name="alias_action">
+                            <option value="map" {% if alias_decision == 'APPROVED' %}selected{% endif %}>Map it to the existing user ({{ alias_base_name }})</option>
+                            <option value="create" {% if alias_decision == 'EDITED' %}selected{% endif %}>Keep this name and create a new user/participant</option>
+                        </select>
+                        <div class="form-text small text-secondary">Choose whether to map the name alias to the matched existing user, or to keep the raw name and create a new participant/user.</div>
+                    </div>
+                </div>
+                {% endif %}
 
                 {% if has_duplicate_anomaly %}
                 <div class="mb-4">

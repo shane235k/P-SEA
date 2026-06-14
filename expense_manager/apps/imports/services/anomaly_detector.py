@@ -262,13 +262,23 @@ def detect_anomalies(session):
             if potential_base and potential_base.lower() in participant_name_map:
                 base_proper_name = participant_name_map[potential_base.lower()].name
                 if raw_p_name != base_proper_name:
+                    # Check if user already decided to keep this raw name and create a new participant/user
+                    is_edited = False
+                    for (t, rv), (is_res, dec) in existing_decisions.items():
+                        if t == 'ALIAS_MAPPING' and dec == 'EDITED':
+                            is_edited = True
+                            break
+                    
                     row_anomalies.append({
                         'type': 'ALIAS_MAPPING',
                         'severity': 'WARNING',
                         'raw_value': f"Payer name: '{raw_p_name}'",
                         'suggested_fix': f"Map alias '{raw_p_name}' to system participant '{base_proper_name}'."
                     })
-                    res_payer = base_proper_name
+                    if is_edited:
+                        res_payer = raw_p_name
+                    else:
+                        res_payer = base_proper_name
             elif norm_p_name in participant_name_map:
                 proper_name = participant_name_map[norm_p_name].name
                 if raw_p_name != proper_name:

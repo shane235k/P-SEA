@@ -20,7 +20,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get("SECRET_KEY")
+SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-k@zavm!@1uwc-d$ltc5v=5#)qmimy6ofly(9&t+@b@v+hdt781")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
@@ -137,5 +137,5 @@ LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/accounts/login/'
 
 # Exchange rate for Currency Mismatch anomaly detection
-USD_TO_INR_RATE = 83.00
+USD_TO_INR_RATE = 95.11
 

@@ -3,6 +3,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.conf import settings
+from expense_manager.apps.accounts.models import Participant
 from expense_manager.apps.groups.models import Group, GroupMembership
 from expense_manager.apps.imports.models import ImportSession, ImportRow, ImportAnomaly
 from expense_manager.apps.imports.services.csv_parser import parse_csv_to_staging
@@ -146,16 +147,35 @@ def edit_staged_row_view(request, session_id, row_id):
         row.is_settlement = 'is_settlement' in request.POST
         
         duplicate_action = request.POST.get('duplicate_action', '')
+        alias_action = request.POST.get('alias_action', '')
+        
+        row.status = 'RESOLVED'
+        row.save()
+        
+        row.anomalies.all().update(is_resolved=True, decision='EDITED')
+        
         if duplicate_action == 'duplicate':
             row.status = 'REJECTED'
             row.save()
             row.anomalies.all().update(is_resolved=True, decision='REJECTED')
-        else:
-            row.status = 'RESOLVED'
+        elif duplicate_action == 'separate':
+            row.anomalies.filter(type='DUPLICATE_ENTRY').update(is_resolved=True, decision='APPROVED')
+            
+        if alias_action == 'create':
+            row.resolved_paid_by_name = row.paid_by
             row.save()
-            row.anomalies.all().update(is_resolved=True, decision='EDITED')
-            if duplicate_action == 'separate':
-                row.anomalies.filter(type='DUPLICATE_ENTRY').update(is_resolved=True, decision='APPROVED')
+            row.anomalies.filter(type='ALIAS_MAPPING').update(is_resolved=True, decision='EDITED')
+        elif alias_action == 'map':
+            import re
+            raw_name = row.paid_by or ""
+            alias_match = re.match(r'^([a-zA-Z]+)\s+[a-zA-Z]$', raw_name.strip())
+            if alias_match:
+                base_name = alias_match.group(1)
+                part = Participant.objects.filter(name__iexact=base_name).first()
+                if part:
+                    row.resolved_paid_by_name = part.name
+                    row.save()
+            row.anomalies.filter(type='ALIAS_MAPPING').update(is_resolved=True, decision='APPROVED')
         
         # Re-run anomaly detector to see if new/re-evaluated errors
         detect_anomalies(session)
@@ -167,6 +187,18 @@ def edit_staged_row_view(request, session_id, row_id):
     duplicate_decision = 'PENDING'
     if has_duplicate_anomaly:
         duplicate_decision = row.anomalies.filter(type='DUPLICATE_ENTRY').first().decision
+        
+    has_alias_anomaly = row.anomalies.filter(type='ALIAS_MAPPING').exists()
+    alias_decision = 'PENDING'
+    alias_base_name = ""
+    if has_alias_anomaly:
+        alias_anom = row.anomalies.filter(type='ALIAS_MAPPING').first()
+        alias_decision = alias_anom.decision
+        import re
+        raw_name = row.paid_by or ""
+        alias_match = re.match(r'^([a-zA-Z]+)\s+[a-zA-Z]$', raw_name.strip())
+        if alias_match:
+            alias_base_name = alias_match.group(1)
         
     # Get group flatmate names mapped for the payer dropdown selection
     memberships = session.group.memberships.select_related('user__participant').all()
@@ -181,6 +213,9 @@ def edit_staged_row_view(request, session_id, row_id):
         'row': row,
         'has_duplicate_anomaly': has_duplicate_anomaly,
         'duplicate_decision': duplicate_decision,
+        'has_alias_anomaly': has_alias_anomaly,
+        'alias_decision': alias_decision,
+        'alias_base_name': alias_base_name,
         'group_members': group_members,
         'current_payer': current_payer
     }
@@ -281,6 +316,44 @@ def resolve_duplicate_view(request, session_id, row_id):
             messages.success(request, f"Row {row.row_number} marked as a separate transaction.")
             
     return redirect('import_review', session_id=session.id)
+
+
+@login_required
+def resolve_alias_view(request, session_id, row_id):
+    session = get_object_or_404(ImportSession, id=session_id)
+    row = get_object_or_404(ImportRow, id=row_id, session=session)
+    
+    if request.user.role != 'ADMIN':
+        messages.error(request, "Access denied.")
+        return redirect('dashboard')
+        
+    if request.method == 'POST':
+        resolution = request.POST.get('resolution', '')
+        
+        if resolution == 'create':
+            row.resolved_paid_by_name = row.paid_by
+            row.status = 'RESOLVED'
+            row.save()
+            row.anomalies.filter(type='ALIAS_MAPPING').update(is_resolved=True, decision='EDITED')
+            messages.success(request, f"Row {row.row_number} set to keep alias '{row.paid_by}' as a new user/participant.")
+        elif resolution == 'map':
+            import re
+            raw_name = row.paid_by or ""
+            alias_match = re.match(r'^([a-zA-Z]+)\s+[a-zA-Z]$', raw_name.strip())
+            if alias_match:
+                base_name = alias_match.group(1)
+                part = Participant.objects.filter(name__iexact=base_name).first()
+                if part:
+                    row.resolved_paid_by_name = part.name
+                    row.status = 'RESOLVED'
+                    row.save()
+            row.anomalies.filter(type='ALIAS_MAPPING').update(is_resolved=True, decision='APPROVED')
+            messages.success(request, f"Row {row.row_number} mapped to existing user.")
+            
+        detect_anomalies(session)
+        
+    return redirect('import_review', session_id=session.id)
+
 
 
 @login_required

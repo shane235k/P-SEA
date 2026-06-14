@@ -1,6 +1,7 @@
 import datetime
 from decimal import Decimal
 from django.test import TestCase
+from django.urls import reverse
 from expense_manager.apps.accounts.models import CustomUser, Participant
 from expense_manager.apps.groups.models import Group, GroupMembership
 from expense_manager.apps.expenses.models import Expense, ExpenseSplit
@@ -276,6 +277,106 @@ class StagingDuplicatesTestCase(TestCase):
         
         # Verify the password and credentials list was stored in report and model
         self.assertIn("NewGuy", self.session.auto_created_accounts_json)
+
+    def test_alias_resolution_options(self):
+        # Create a participant Aisha
+        aisha_user = CustomUser.objects.create_user(email="aisha@example.com", name="Aisha")
+        aisha_participant = Participant.objects.create(name="Aisha", user=aisha_user)
+        
+        # Create a staged row with payer alias "Aisha S"
+        row = ImportRow.objects.create(
+            session=self.session,
+            row_number=5,
+            date="2026-02-01",
+            description="Coffee",
+            paid_by="Aisha S",
+            amount="120",
+            currency="INR",
+            split_type="equal",
+            split_with="Aisha;Admin"
+        )
+        
+        # Run anomaly detection
+        detect_anomalies(self.session)
+        
+        row_reload = ImportRow.objects.get(id=row.id)
+        # Verify ALIAS_MAPPING anomaly is raised
+        self.assertTrue(row_reload.anomalies.filter(type='ALIAS_MAPPING').exists())
+        # The auto-resolution by default maps it (sets res_payer to Aisha)
+        self.assertEqual(row_reload.resolved_paid_by_name, "Aisha")
+        
+        # Scenario 1: User chooses 'create' (keep alias and create new user)
+        # Simulate POST action by calling the view or doing database updates & re-running detection
+        # Set decision to EDITED
+        anom = row_reload.anomalies.get(type='ALIAS_MAPPING')
+        anom.is_resolved = True
+        anom.decision = 'EDITED'
+        anom.save()
+        
+        # When user chooses create, views.py sets resolved_paid_by_name to raw name "Aisha S"
+        row_reload.resolved_paid_by_name = "Aisha S"
+        row_reload.save()
+        
+        # Re-run detection
+        detect_anomalies(self.session)
+        
+        row_reload2 = ImportRow.objects.get(id=row.id)
+        # Verify the raw name is preserved and not overwritten to Aisha
+        self.assertEqual(row_reload2.resolved_paid_by_name, "Aisha S")
+        # Verify the anomaly is still in the DB with status EDITED/resolved
+        anom2 = row_reload2.anomalies.get(type='ALIAS_MAPPING')
+        self.assertTrue(anom2.is_resolved)
+        self.assertEqual(anom2.decision, 'EDITED')
+        
+        # Scenario 2: User chooses 'map'
+        # Set decision to APPROVED, and set name to base name "Aisha"
+        anom2.is_resolved = True
+        anom2.decision = 'APPROVED'
+        anom2.save()
+        row_reload2.resolved_paid_by_name = "Aisha"
+        row_reload2.save()
+        
+        # Re-run detection
+        detect_anomalies(self.session)
+        row_reload3 = ImportRow.objects.get(id=row.id)
+        # Since the name is now Aisha, which matches base name, the ALIAS_MAPPING warning is resolved/cleared from DB
+        self.assertFalse(row_reload3.anomalies.filter(type='ALIAS_MAPPING').exists())
+
+        # Test editing GET renders dropdown and the resolve_alias views
+        self.admin.role = 'ADMIN'
+        self.admin.set_password("password123")
+        self.admin.save()
+        self.client.login(email="admin2@example.com", password="password123")
+        
+        # Reset row to trigger ALIAS_MAPPING warning
+        row_reload3.resolved_paid_by_name = "Aisha S"
+        row_reload3.save()
+        detect_anomalies(self.session)
+        
+        # Test GET edit row has alias resolution option in template
+        response = self.client.get(reverse('edit_row', args=[self.session.id, row.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Name Alias Resolution')
+        
+        # Test POST resolve_alias to 'create' (Keep Name)
+        resolve_url = reverse('resolve_alias', args=[self.session.id, row.id])
+        response = self.client.post(resolve_url, {'resolution': 'create'})
+        self.assertRedirects(response, reverse('import_review', args=[self.session.id]))
+        
+        # Verify row name is kept as "Aisha S" and anomaly is resolved as EDITED
+        row_final = ImportRow.objects.get(id=row.id)
+        self.assertEqual(row_final.resolved_paid_by_name, "Aisha S")
+        anom_final = row_final.anomalies.get(type='ALIAS_MAPPING')
+        self.assertTrue(anom_final.is_resolved)
+        self.assertEqual(anom_final.decision, 'EDITED')
+        
+        # Test POST resolve_alias to 'map' (Map to existing user)
+        response = self.client.post(resolve_url, {'resolution': 'map'})
+        self.assertRedirects(response, reverse('import_review', args=[self.session.id]))
+        row_final2 = ImportRow.objects.get(id=row.id)
+        self.assertEqual(row_final2.resolved_paid_by_name, "Aisha")
+        self.assertFalse(row_final2.anomalies.filter(type='ALIAS_MAPPING').exists())
+
 
 
 

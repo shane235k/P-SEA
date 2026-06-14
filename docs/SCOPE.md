@@ -127,14 +127,14 @@ erDiagram
 
 | # | Anomaly Category | Description / Example | Severity | Default Action Taken | Handling Policy |
 |---|---|---|---|---|---|
-| 1 | **Currency Mismatch** | Row has USD currency | `WARNING` | Auto-Convert + Keep original | Converts to INR at configured rate (83.00), storing conversion audit values. |
+| 1 | **Currency Mismatch** | Row has USD currency | `WARNING` | Auto-Convert + Keep original | Converts to INR at configured rate (95.11)(as of 14 June 2026), storing conversion audit values. |
 | 2 | **Exact Duplicate** | Exact matching row date/amount/payer/splits | `WARNING` | Flag for Approval | Staged and flagged. Requires admin to hit Approve or Reject Row. |
 | 3 | **Conflicting Duplicate** | Same date/payer/splits, different amount | `ERROR` | Block row | Blocked. User must resolve by editing the row or rejecting it. |
 | 4 | **Numeric Formatting** | Amount contains commas (`1,200`) or decimals | `INFO` | Auto Fix | Strip commas, trim, and round using Round Half Up. |
 | 5 | **Name Normalization** | Whitespace or case issues (`priya`, `rohan `) | `INFO` | Auto Fix | Trim spaces and match casing against registered participants. |
-| 6 | **Alias Mapping** | Name with initial (`Priya S`) | `WARNING` | Require Approval | Matches base name. Flagged as warning, resolved on approval. |
+| 6 | **Alias Mapping** | Name with initial (`Priya S`) | `WARNING` | Require Approval | Flagged as warning. Administrator can choose to either map the alias to the matched system user, or keep the raw name and create a new participant/user. |
 | 7 | **Missing Payer** | `paid_by` column is empty | `ERROR` | Block row | Creates draft expense. Requires User Input to assign correct payer. |
-| 8 | **Missing Currency** | Empty currency string | `WARNING` | Review | Suggests `INR` and flags for admin confirmation. |
+| 8 | **Missing Currency** | Empty currency string | `WARNING` | Review | User selects from a dropdown (INR or USD) in the row editor interface. |
 | 9 | **Settlement as Expense** | Description matches `paid back`, `repaid`, etc. | `WARNING` | Auto-Convert | Flags `is_settlement=True` to create a Settlement rather than Expense. |
 | 10| **Invalid Percentages** | Percentages sum to `110%` | `ERROR` | Block row | Blocked until user edits the split details to sum to exactly 100%. |
 | 11| **Split Metadata Conflict**| Split type `equal` but details supplied | `ERROR` | Block row | Blocked. Requires admin to select Split type or remove details. |
