@@ -168,11 +168,21 @@ def edit_staged_row_view(request, session_id, row_id):
     if has_duplicate_anomaly:
         duplicate_decision = row.anomalies.filter(type='DUPLICATE_ENTRY').first().decision
         
+    # Get group flatmate names mapped for the payer dropdown selection
+    memberships = session.group.memberships.select_related('user__participant').all()
+    group_members = [m.user.name for m in memberships]
+    
+    current_payer = row.resolved_paid_by_name or row.paid_by or ""
+    if current_payer and current_payer not in group_members:
+        group_members.append(current_payer)
+        
     context = {
         'session': session,
         'row': row,
         'has_duplicate_anomaly': has_duplicate_anomaly,
-        'duplicate_decision': duplicate_decision
+        'duplicate_decision': duplicate_decision,
+        'group_members': group_members,
+        'current_payer': current_payer
     }
     return render(request, 'imports/edit_row.html', context)
 

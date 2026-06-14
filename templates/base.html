@@ -17,94 +17,285 @@
         :root {
             --primary-gradient: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
             --secondary-gradient: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
-            --bg-color: #f8fafc;
-            --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
-            --header-font: 'Outfit', sans-serif;
+            --bg-color: #f6f8fa; /* GitHub gray bg */
+            --border-color: #d0d7de; /* GitHub border color */
+            --text-color: #24292f; /* GitHub body text */
+            --text-muted: #57606a; /* GitHub gray text */
         }
 
         body {
-            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
             background-color: var(--bg-color);
-            color: #1e293b;
+            color: var(--text-color);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            font-size: 14px;
         }
 
         h1, h2, h3, h4, h5, h6 {
-            font-family: var(--header-font);
+            color: var(--text-color);
             font-weight: 600;
         }
 
+        h1 { font-size: 24px; }
+        h2 { font-size: 20px; }
+        h3 { font-size: 18px; }
+        h4 { font-size: 16px; }
+
+        /* GitHub Repo Header-style Breadcrumbs */
+        .breadcrumb {
+            background: transparent;
+            padding: 0;
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+        .breadcrumb-item a {
+            color: #0969da;
+            text-decoration: none;
+            font-weight: 400;
+        }
+        .breadcrumb-item a:hover {
+            text-decoration: underline;
+        }
+        .breadcrumb-item.active {
+            color: var(--text-color);
+            font-weight: 600;
+        }
+        .breadcrumb-item + .breadcrumb-item::before {
+            content: "/";
+            color: #57606a;
+        }
+
+        /* GitHub dark navbar header */
+        .navbar {
+            background-color: #24292f !important; /* GitHub dark header */
+            border-bottom: 1px solid #30363d !important;
+            padding-top: 12px !important;
+            padding-bottom: 12px !important;
+        }
         .navbar-brand {
-            font-family: var(--header-font);
-            font-weight: 700;
-            letter-spacing: -0.5px;
-            background: var(--primary-gradient);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .glass-card {
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.4);
-            border-radius: 16px;
-            box-shadow: var(--card-shadow);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .glass-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        }
-
-        .btn-primary-grad {
-            background: var(--primary-gradient);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-weight: 500;
-            padding: 8px 18px;
-            transition: all 0.2s ease;
-        }
-
-        .btn-primary-grad:hover {
-            opacity: 0.9;
-            transform: scale(1.02);
-            color: white;
-        }
-
-        .badge-admin {
-            background: #ffe4e6;
-            color: #e11d48;
-            border: 1px solid #fda4af;
-        }
-
-        .badge-member {
-            background: #e0f2fe;
-            color: #0369a1;
-            border: 1px solid #7dd3fc;
-        }
-        
-        .badge-external {
-            background: #f1f5f9;
-            color: #475569;
-            border: 1px solid #cbd5e1;
-        }
-
-        .table-custom th {
             font-weight: 600;
-            color: #475569;
-            background-color: #f1f5f9;
+            color: #ffffff !important;
+            display: flex;
+            align-items: center;
+            font-size: 16px !important;
+        }
+        .navbar-brand i {
+            color: #ffffff;
+        }
+        .navbar .nav-link {
+            color: #c9d1d9 !important;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .navbar .nav-link:hover {
+            color: #ffffff !important;
+        }
+        .navbar .text-secondary {
+            color: #8b949e !important;
+            font-size: 13px;
+        }
+        .navbar .text-secondary strong {
+            color: #ffffff;
+        }
+
+        /* GitHub Box / Card Layout */
+        .glass-card, .card {
+            background-color: #ffffff !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 6px !important;
+            box-shadow: 0 1px 0 rgba(27,31,36,0.04) !important;
+            backdrop-filter: none !important;
+            transition: none !important;
+            padding: 16px !important;
+            margin-bottom: 16px;
+        }
+        .glass-card:hover, .card:hover {
+            transform: none !important;
+            box-shadow: 0 1px 0 rgba(27,31,36,0.04) !important;
+        }
+
+        /* GitHub Buttons */
+        .btn {
+            border-radius: 6px !important;
+            font-weight: 500 !important;
+            font-size: 14px !important;
+            padding: 5px 16px !important;
+            transition: background-color 0.2s cubic-bezier(0.3, 0, 0.5, 1) !important;
+        }
+        .btn-primary-grad {
+            background-color: #1f883d !important; /* GitHub Green for main buttons */
+            background-image: none !important;
+            border: 1px solid rgba(27,31,36,0.15) !important;
+            color: #ffffff !important;
+            box-shadow: 0 1px 0 rgba(27,31,36,0.1), inset 0 1px 0 rgba(255,255,255,0.03) !important;
+        }
+        .btn-primary-grad:hover {
+            background-color: #1a7f37 !important;
+            opacity: 1 !important;
+            transform: none !important;
+            color: #ffffff !important;
+        }
+        .btn-outline-secondary {
+            background-color: #f6f8fa !important;
+            border: 1px solid var(--border-color) !important;
+            color: #24292f !important;
+            box-shadow: 0 1px 0 rgba(27,31,36,0.04) !important;
+        }
+        .btn-outline-secondary:hover {
+            background-color: #f3f4f6 !important;
+            color: #24292f !important;
+            border-color: rgba(27,31,36,0.15) !important;
+        }
+        .btn-outline-success {
+            background-color: #f6f8fa !important;
+            border: 1px solid var(--border-color) !important;
+            color: #1f883d !important;
+        }
+        .btn-outline-success:hover {
+            background-color: #1f883d !important;
+            color: #ffffff !important;
+            border-color: #1f883d !important;
+        }
+        .btn-outline-danger {
+            background-color: #f6f8fa !important;
+            border: 1px solid var(--border-color) !important;
+            color: #cf222e !important;
+        }
+        .btn-outline-danger:hover {
+            background-color: #cf222e !important;
+            color: #ffffff !important;
+            border-color: #cf222e !important;
+        }
+        .btn-warning {
+            background-color: #f6f8fa !important;
+            border: 1px solid var(--border-color) !important;
+            color: #24292f !important;
+            font-weight: 500 !important;
+        }
+        .btn-warning:hover {
+            background-color: #f3f4f6 !important;
+            color: #24292f !important;
+        }
+
+        /* GitHub Badges */
+        .badge {
+            border-radius: 2em !important;
+            padding: 3px 8px !important;
+            font-size: 12px !important;
+            font-weight: 500 !important;
+            display: inline-flex;
+            align-items: center;
+        }
+        .badge-admin {
+            background-color: #ffebe9 !important;
+            color: #cf222e !important;
+            border: 1px solid rgba(207,34,46,0.15) !important;
+        }
+        .badge-member {
+            background-color: #ddf4ff !important;
+            color: #0969da !important;
+            border: 1px solid rgba(9,105,218,0.15) !important;
+        }
+        .badge-external {
+            background-color: #f6f8fa !important;
+            color: #57606a !important;
+            border: 1px solid var(--border-color) !important;
+        }
+        .bg-success-subtle {
+            background-color: #dafbe1 !important;
+            color: #115324 !important;
+        }
+        .bg-warning-subtle {
+            background-color: #fff8c5 !important;
+            color: #705400 !important;
+        }
+        .bg-danger-subtle {
+            background-color: #ffebe9 !important;
+            color: #cf222e !important;
+        }
+
+        /* GitHub Tables */
+        .table {
+            border-color: var(--border-color) !important;
+            margin-bottom: 0;
+            background-color: #ffffff;
+        }
+        .table thead th {
+            background-color: #f6f8fa !important;
+            color: var(--text-color) !important;
+            font-weight: 600 !important;
+            border-bottom: 1px solid var(--border-color) !important;
+            text-transform: none !important;
+            font-size: 12px;
+            padding: 8px 12px !important;
+        }
+        .table tbody td {
+            padding: 10px 12px !important;
+            border-bottom: 1px solid #e1e4e8 !important;
+        }
+        .table-hover tbody tr:hover {
+            background-color: #f6f8fa !important;
+        }
+
+        /* Inputs & Form Controls */
+        .form-control, .form-select {
+            border-radius: 6px !important;
+            border: 1px solid var(--border-color) !important;
+            background-color: #f6f8fa !important;
+            font-size: 14px !important;
+            padding: 5px 12px !important;
+        }
+        .form-control:focus, .form-select:focus {
+            border-color: #0969da !important;
+            box-shadow: 0 0 0 3px rgba(9,105,218,0.3) !important;
+            background-color: #ffffff !important;
+        }
+
+        /* Monospace / Code styling */
+        code {
+            font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, "Liberation Mono", monospace !important;
+            background-color: rgba(175,184,193,0.2) !important;
+            color: var(--text-color) !important;
+            padding: 3px 6px !important;
+            border-radius: 6px !important;
+            font-size: 12px !important;
+        }
+
+        /* Alert notifications */
+        .alert {
+            border-radius: 6px !important;
+            border: 1px solid var(--border-color) !important;
+            font-size: 14px;
+            padding: 12px 16px !important;
+        }
+        .alert-success {
+            background-color: #dafbe1 !important;
+            border-color: #4ac26b !important;
+            color: #115324 !important;
+        }
+        .alert-danger {
+            background-color: #ffebe9 !important;
+            border-color: #ff8182 !important;
+            color: #8e1f24 !important;
+        }
+        .alert-secondary, .alert-info {
+            background-color: #f6f8fa !important;
+            border-color: var(--border-color) !important;
+            color: var(--text-color) !important;
         }
 
         footer {
             margin-top: auto;
-            background: #0f172a;
-            color: #94a3b8;
-            padding: 24px 0;
-            font-size: 14px;
+            background-color: #24292f;
+            border-top: 1px solid #30363d;
+            color: #8b949e;
+            padding: 20px 0;
+            font-size: 12px;
+        }
+        footer p {
+            margin: 0;
         }
     </style>
 </head>
