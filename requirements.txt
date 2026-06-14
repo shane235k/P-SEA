@@ -17,6 +17,7 @@ click==8.4.1
 colorama==0.4.6
 cryptography==46.0.6
 cssselect2==0.9.0
+dj-database-url==3.1.2
 Django==6.0.6
 dnspython==2.8.0
 email-validator==2.3.0
@@ -30,6 +31,7 @@ fonttools==4.62.1
 fpdf==1.7.2
 frozenlist==1.8.0
 fsspec==2026.4.0
+gunicorn==26.0.0
 h11==0.16.0
 hf-xet==1.5.0
 httpcore==1.0.9
@@ -127,6 +129,7 @@ webencodings==0.5.1
 websocket-client==1.9.0
 websockets==16.0
 Werkzeug==3.1.6
+whitenoise==6.12.0
 widgetsnbextension==4.0.15
 yarl==1.23.0
 zopfli==0.4.1
