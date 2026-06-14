@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+
+{% block title %}System Settings - SplitAudit{% endblock %}
+
+{% block content %}
+<div class="row align-items-center mb-4">
+    <div class="col">
+        <h1 class="text-dark mb-1 fw-bold">Settings & System Info</h1>
+        <p class="text-muted mb-0">System parameters, exchange rates, and database credentials.</p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Config Parameters -->
+    <div class="col-lg-6 mb-4">
+        <div class="card bg-white border-0 shadow-sm p-4 h-100">
+            <h4 class="text-dark mb-3"><i class="bi bi-gear-wide-connected text-primary me-2"></i> Configuration Parameters</h4>
+            
+            <div class="mb-4">
+                <span class="text-secondary small d-block font-monospace" style="font-size: 10px; letter-spacing: 0.5px;">USD TO INR FIXED EXCHANGE RATE</span>
+                <strong class="text-dark fs-5 font-monospace">1 USD = {{ usd_rate }} INR</strong>
+                <p class="text-muted small mt-1">Configured globally in <code>settings.py</code> to handle Currency Mismatch anomalies.</p>
+            </div>
+            
+            <div class="mb-4 border-top pt-3">
+                <span class="text-secondary small d-block font-monospace" style="font-size: 10px; letter-spacing: 0.5px;">SECURITY ENFORCEMENTS</span>
+                <ul class="list-unstyled text-dark mt-2 small">
+                    <li class="mb-1"><i class="bi bi-shield-check text-success me-2"></i> Custom email-based user registration</li>
+                    <li class="mb-1"><i class="bi bi-shield-check text-success me-2"></i> Date-bound splits boundary protection</li>
+                    <li class="mb-1"><i class="bi bi-shield-check text-success me-2"></i> Audit logs trail tracking</li>
+                </ul>
+            </div>
+            
+            <div class="border-top pt-3">
+                <span class="text-secondary small d-block font-monospace mb-2" style="font-size: 10px; letter-spacing: 0.5px;">SYSTEM DETAILS</span>
+                <span class="badge bg-light text-dark border p-2 font-monospace">Django 6.0.6</span>
+                <span class="badge bg-light text-dark border p-2 font-monospace">Python 3.14.3</span>
+                <span class="badge bg-light text-dark border p-2 font-monospace">Database: SQLite3</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Team / Users Directory -->
+    <div class="col-lg-6 mb-4">
+        <div class="card bg-white border-0 shadow-sm p-4 h-100">
+            <h4 class="text-dark mb-3"><i class="bi bi-people-fill text-primary me-2"></i> Registered Team Members</h4>
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email Address</th>
+                            <th class="text-end">System Role</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for u in users %}
+                        <tr>
+                            <td class="fw-semibold text-dark">{{ u.name }}</td>
+                            <td class="text-secondary small font-monospace">{{ u.email }}</td>
+                            <td class="text-end">
+                                <span class="badge {% if u.role == 'ADMIN' %}badge-admin{% else %}badge-member{% endif %}">
+                                    {{ u.role }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

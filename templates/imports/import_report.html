@@ -16,6 +16,9 @@
         <p class="text-muted small">Generated on {{ report.timestamp }} &bull; File: <code>{{ report.file_name }}</code></p>
     </div>
     <div class="col-md-4 text-md-end mt-3 mt-md-0">
+        <a href="{% url 'import_report_pdf' session.id %}" target="_blank" class="btn btn-outline-primary me-2">
+            <i class="bi bi-file-pdf"></i> Download PDF Report
+        </a>
         <a href="{% url 'group_detail' session.group.id %}" class="btn btn-primary-grad">
             <i class="bi bi-arrow-left"></i> Back to {{ session.group.name }}
         </a>

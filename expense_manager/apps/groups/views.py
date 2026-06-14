@@ -60,8 +60,45 @@ def dashboard_view(request):
                 from_name = simp['from'].name
                 people_who_owe_you[from_name] = people_who_owe_you.get(from_name, Decimal('0.00')) + simp['amount']
 
-    # Get recent expenses from user's groups
-    recent_expenses = Expense.objects.filter(group__in=user_groups).order_by('-expense_date', '-created_at')[:5]
+    # Search and sorting query parameters
+    query = request.GET.get('q', '').strip()
+    sort_by = request.GET.get('sort_by', '-date').strip()
+    
+    expenses_qs = Expense.objects.filter(group__in=user_groups)
+    
+    if query:
+        expenses_qs = expenses_qs.filter(
+            description__icontains=query
+        ) | expenses_qs.filter(
+            paid_by__name__icontains=query
+        ) | expenses_qs.filter(
+            group__name__icontains=query
+        )
+        
+    # Sorting logic
+    if sort_by == 'amount':
+        expenses_qs = expenses_qs.order_by('amount', '-created_at')
+    elif sort_by == '-amount':
+        expenses_qs = expenses_qs.order_by('-amount', '-created_at')
+    elif sort_by == 'description':
+        expenses_qs = expenses_qs.order_by('description', '-created_at')
+    elif sort_by == 'date':
+        expenses_qs = expenses_qs.order_by('expense_date', '-created_at')
+    else: # default -date
+        expenses_qs = expenses_qs.order_by('-expense_date', '-created_at')
+        
+    # Limit dashboard view display, but for export we export all matching
+    recent_expenses = expenses_qs[:5]
+    if request.GET.get('export') == 'csv':
+        import csv
+        from django.http import HttpResponse
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="expenses_export_{datetime.date.today()}.csv"'
+        writer = csv.writer(response)
+        writer.writerow(['Description', 'Group', 'Paid By', 'Date', 'Amount', 'Status'])
+        for exp in expenses_qs:
+            writer.writerow([exp.description, exp.group.name, exp.paid_by.name, exp.expense_date.strftime('%Y-%m-%d'), exp.amount, exp.status])
+        return response
     
     # Get recent settlements from user's groups
     recent_settlements = Settlement.objects.filter(group__in=user_groups).order_by('-date', '-created_at')[:5]
@@ -71,15 +108,61 @@ def dashboard_view(request):
     if user.role == 'ADMIN':
         import_status = ImportSession.objects.all().order_by('-created_at')[:5]
 
+    total_you_owe = sum(people_you_owe.values())
+    total_owed_to_you = sum(people_who_owe_you.values())
+    total_debts = total_you_owe + total_owed_to_you
+    
+    if total_debts > 0:
+        owed_pct = int((total_owed_to_you / total_debts) * 100)
+        owe_pct = 100 - owed_pct
+    else:
+        owed_pct = 50
+        owe_pct = 50
+
+    # Generate Group Summaries matching the budget card layout
+    group_summaries = []
+    for g in user_groups:
+        balances_data = get_group_balances(g)
+        
+        # Total spent in group
+        group_total = sum(exp.amount for exp in g.expenses.filter(status='ACTIVE'))
+        
+        # User net in this group
+        user_net = Decimal('0.00')
+        if participant.id in balances_data['balances']:
+            user_net = balances_data['balances'][participant.id]['net']
+            
+        # Calculate visual fill percent
+        if group_total > 0:
+            share_pct = min(100, int((abs(user_net) / group_total) * 100))
+            if share_pct == 0:
+                share_pct = 25
+        else:
+            share_pct = 0
+            
+        group_summaries.append({
+            'group': g,
+            'total_spent': group_total,
+            'user_net': user_net,
+            'share_pct': share_pct
+        })
+
     context = {
         'all_groups': all_groups,
         'user_groups': user_groups,
         'total_net_balance': total_net_balance,
+        'total_you_owe': total_you_owe,
+        'total_owed_to_you': total_owed_to_you,
+        'owed_pct': owed_pct,
+        'owe_pct': owe_pct,
+        'group_summaries': group_summaries,
         'people_you_owe': people_you_owe,
         'people_who_owe_you': people_who_owe_you,
         'recent_expenses': recent_expenses,
         'recent_settlements': recent_settlements,
-        'import_status': import_status
+        'import_status': import_status,
+        'q_query': query,
+        'sort_by': sort_by
     }
     return render(request, 'groups/dashboard.html', context)
 
@@ -122,7 +205,11 @@ def group_detail_view(request, group_id):
     balances_data = get_group_balances(group)
     
     # Expenses (Include Active, Draft, Inactive)
-    expenses = group.expenses.all().order_by('-expense_date', '-created_at')
+    expenses_qs = group.expenses.all().order_by('-expense_date', '-created_at')
+    from django.core.paginator import Paginator
+    paginator = Paginator(expenses_qs, 15)
+    page_number = request.GET.get('page')
+    expenses = paginator.get_page(page_number)
     
     # Settlements
     settlements = group.settlements.all().order_by('-date', '-created_at')
@@ -138,6 +225,30 @@ def group_detail_view(request, group_id):
     if hasattr(user, 'participant'):
         user_part_id = user.participant.id
 
+    # Active tab from query param
+    active_tab = request.GET.get('tab', 'overview')
+    if active_tab not in ['overview', 'expenses', 'imports']:
+        active_tab = 'overview'
+
+    # Compute contribution data for Chart.js
+    # List of participants in group and their total active spend contribution
+    contributions = []
+    members_list = [m.user.participant for m in memberships if hasattr(m.user, 'participant')]
+    for member in members_list:
+        member_spent = sum(exp.amount for exp in group.expenses.filter(paid_by=member, status='ACTIVE'))
+        contributions.append({
+            'name': member.name,
+            'spent': float(member_spent)
+        })
+
+    # Prepare net balances list for Chart.js
+    chart_balances = []
+    for p_id, bal in balances_data['balances'].items():
+        chart_balances.append({
+            'name': bal['participant'].name,
+            'net': float(bal['net'])
+        })
+
     context = {
         'group': group,
         'memberships': memberships,
@@ -147,7 +258,10 @@ def group_detail_view(request, group_id):
         'simplifications': balances_data['simplifications'],
         'explanations': balances_data['explanations'],
         'import_history': import_history,
-        'user_part_id': user_part_id
+        'user_part_id': user_part_id,
+        'active_tab': active_tab,
+        'contributions_json': contributions,
+        'chart_balances_json': chart_balances
     }
     return render(request, 'groups/group_detail.html', context)
 
@@ -374,3 +488,249 @@ def flush_group_data_view(request, group_id):
         return redirect('group_detail', group_id=group.id)
         
     return redirect('group_detail', group_id=group.id)
+
+
+@login_required
+def export_group_report_view(request, group_id):
+    group = get_object_or_404(Group, id=group_id)
+    user = request.user
+    
+    is_member = GroupMembership.objects.filter(group=group, user=user).exists()
+    if not is_member and user.role != 'ADMIN':
+        messages.error(request, "Access denied.")
+        return redirect('dashboard')
+        
+    import csv
+    from django.http import HttpResponse
+    
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="group_{group.name}_report_{datetime.date.today()}.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow(['TYPE', 'DATE', 'DESCRIPTION', 'PAYER/FROM', 'RECEIVER/TO', 'AMOUNT', 'STATUS', 'CURRENCY', 'NOTES'])
+    
+    # Write expenses
+    for exp in group.expenses.all().order_by('expense_date'):
+        writer.writerow([
+            'EXPENSE',
+            exp.expense_date.strftime('%Y-%m-%d'),
+            exp.description,
+            exp.paid_by.name,
+            'ALL_MEMBERS',
+            exp.amount,
+            exp.status,
+            exp.currency,
+            ''
+        ])
+        
+    # Write settlements
+    for setl in group.settlements.all().order_by('date'):
+        writer.writerow([
+            'SETTLEMENT',
+            setl.date.strftime('%Y-%m-%d'),
+            f'Settlement: {setl.payer.name} paid {setl.receiver.name}',
+            setl.payer.name,
+            setl.receiver.name,
+            setl.amount,
+            'COMPLETED',
+            setl.currency,
+            ''
+        ])
+        
+    return response
+
+
+@login_required
+def reports_view(request):
+    user = request.user
+    
+    # Get completed import sessions
+    user_memberships = GroupMembership.objects.filter(user=user)
+    user_groups = [m.group for m in user_memberships]
+    
+    if user.role == 'ADMIN':
+        sessions = ImportSession.objects.all().order_by('-created_at')
+    else:
+        sessions = ImportSession.objects.filter(group__in=user_groups).order_by('-created_at')
+        
+    # Check if download requested
+    download_session_id = request.GET.get('download')
+    if download_session_id:
+        sess = get_object_or_404(ImportSession, id=download_session_id)
+        # Auth check
+        if user.role != 'ADMIN' and sess.group not in user_groups:
+            messages.error(request, "Access denied.")
+            return redirect('reports')
+            
+        import json
+        from django.http import HttpResponse
+        
+        report_data = {
+            'session_id': sess.id,
+            'group_name': sess.group.name,
+            'file_name': sess.file_name,
+            'uploaded_by': sess.uploaded_by.name if sess.uploaded_by else 'System',
+            'status': sess.status,
+            'created_at': sess.created_at.strftime('%Y-%m-%d %H:%M:%S UTC'),
+            'total_rows': sess.rows.count(),
+            'imported_rows': sess.rows.filter(is_imported=True).count(),
+            'rejected_rows': sess.rows.filter(status='REJECTED').count(),
+            'anomalies_count': sess.anomalies.count(),
+            'anomalies_list': [
+                {
+                    'row': anom.row.row_number if anom.row else 'Global',
+                    'type': anom.type,
+                    'severity': anom.severity,
+                    'message': anom.suggested_fix,
+                    'raw_value': anom.raw_value,
+                    'resolved': anom.is_resolved,
+                    'decision': anom.decision or 'None'
+                }
+                for anom in sess.anomalies.all()
+            ]
+        }
+        
+        response = HttpResponse(json.dumps(report_data, indent=2), content_type='application/json')
+        response['Content-Disposition'] = f'attachment; filename="import_report_{sess.id}.json"'
+        return response
+        
+    context = {
+        'sessions': sessions,
+        'user_groups': user_groups
+    }
+    return render(request, 'groups/reports.html', context)
+
+
+@login_required
+def history_view(request):
+    user = request.user
+    user_memberships = GroupMembership.objects.filter(user=user)
+    user_groups = [m.group for m in user_memberships]
+    
+    # Query all expenses and settlements
+    expenses = Expense.objects.filter(group__in=user_groups)
+    settlements = Settlement.objects.filter(group__in=user_groups)
+    
+    # Unified list
+    history_items = []
+    for exp in expenses:
+        history_items.append({
+            'type': 'Expense',
+            'date': exp.expense_date,
+            'description': exp.description,
+            'group': exp.group,
+            'payer': exp.paid_by.name,
+            'receiver': 'All members',
+            'amount': exp.amount,
+            'status': exp.status,
+            'created_at': exp.created_at
+        })
+        
+    for setl in settlements:
+        history_items.append({
+            'type': 'Settlement',
+            'date': setl.date,
+            'description': f"{setl.payer.name} paid {setl.receiver.name}",
+            'group': setl.group,
+            'payer': setl.payer.name,
+            'receiver': setl.receiver.name,
+            'amount': setl.amount,
+            'status': 'ACTIVE',
+            'created_at': setl.created_at
+        })
+        
+    # Sort by date, then created_at
+    history_items.sort(key=lambda x: (x['date'], x['created_at']), reverse=True)
+    
+    # Filtering
+    query = request.GET.get('q', '').strip()
+    group_id = request.GET.get('group', '')
+    
+    if query:
+        history_items = [
+            item for item in history_items
+            if query.lower() in item['description'].lower() or
+               query.lower() in item['payer'].lower() or
+               query.lower() in item['group'].name.lower()
+        ]
+        
+    if group_id:
+        try:
+            g_id = int(group_id)
+            history_items = [item for item in history_items if item['group'].id == g_id]
+        except ValueError:
+            pass
+            
+    # Pagination
+    from django.core.paginator import Paginator
+    paginator = Paginator(history_items, 15)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # Simple list display
+    context = {
+        'history_items': page_obj,
+        'user_groups': user_groups,
+        'selected_group': group_id,
+        'q_query': query
+    }
+    return render(request, 'groups/history.html', context)
+
+
+@login_required
+def profile_view(request):
+    user = request.user
+    memberships = GroupMembership.objects.filter(user=user).select_related('group')
+    user_groups = [m.group for m in memberships]
+    
+    # Compute user's net totals across all groups
+    total_net = Decimal('0.00')
+    total_paid = Decimal('0.00')
+    total_shares = Decimal('0.00')
+    
+    # Get participant profile
+    try:
+        participant = user.participant
+    except Participant.DoesNotExist:
+        participant = Participant.objects.create(name=user.name, user=user, is_external=False)
+        
+    for g in user_groups:
+        balances_data = get_group_balances(g)
+        
+        # User net in this group
+        if participant.id in balances_data['balances']:
+            user_bal = balances_data['balances'][participant.id]
+            total_net += user_bal['net']
+            
+        # Expenses paid by user in this group
+        g_paid = g.expenses.filter(paid_by=participant, status='ACTIVE')
+        total_paid += sum(exp.amount for exp in g_paid)
+        
+        # Split share of user in this group
+        g_splits = ExpenseSplit.objects.filter(expense__group=g, participant=participant, expense__status='ACTIVE')
+        total_shares += sum(s.share_amount for s in g_splits)
+        
+    context = {
+        'memberships': memberships,
+        'total_net': total_net,
+        'total_paid': total_paid,
+        'total_shares': total_shares,
+        'participant': participant
+    }
+    return render(request, 'groups/profile.html', context)
+
+
+@login_required
+def settings_view(request):
+    user = request.user
+    
+    # System users
+    users = CustomUser.objects.all().order_by('name')
+    participants = Participant.objects.all().order_by('name')
+    
+    context = {
+        'users': users,
+        'participants': participants,
+        'usd_rate': getattr(settings, 'USD_TO_INR_RATE', 83.00),
+    }
+    return render(request, 'groups/settings.html', context)

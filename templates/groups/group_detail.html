@@ -4,6 +4,7 @@
 {% block title %}{{ group.name }} - SplitAudit{% endblock %}
 
 {% block content %}
+<!-- Top Header Area -->
 <div class="row align-items-center mb-4">
     <div class="col-md-7">
         <nav aria-label="breadcrumb">
@@ -12,11 +13,16 @@
                 <li class="breadcrumb-item active" aria-current="page">{{ group.name }}</li>
             </ol>
         </nav>
-        <h1 class="text-dark mb-0"><i class="bi bi-folder-fill text-warning me-2"></i> {{ group.name }}</h1>
-        <p class="text-muted small mb-0">Created by {{ group.created_by.name }} &bull; Admin controls active</p>
+        <h1 class="text-dark mb-0 fw-bold"><i class="bi bi-folder-fill text-primary me-2"></i> {{ group.name }}</h1>
+        <p class="text-muted small mb-0">Created by {{ group.created_by.name }} &bull; Active Tab: <strong class="text-uppercase">{{ active_tab }}</strong></p>
     </div>
     <div class="col-md-5 text-md-end mt-3 mt-md-0">
         <div class="d-flex flex-wrap gap-2 justify-content-md-end">
+            <!-- Download Group Report CSV -->
+            <a href="{% url 'export_group_report' group.id %}" class="btn btn-outline-secondary" title="Download Report">
+                <i class="bi bi-file-earmark-arrow-down text-success"></i> Download Report
+            </a>
+            
             {% if user.role == 'ADMIN' %}
             <a href="{% url 'upload_csv' group.id %}" class="btn btn-warning fw-bold text-dark">
                 <i class="bi bi-file-earmark-arrow-up-fill"></i> Import CSV
@@ -41,14 +47,39 @@
     </div>
 </div>
 
-<!-- Grid System -->
+<!-- Local Tab Selector (pill-styled buttons for secondary navigation) -->
+<div class="row mb-4">
+    <div class="col-12">
+        <ul class="nav nav-pills border-bottom pb-2 gap-2">
+            <li class="nav-item">
+                <a class="nav-link py-1 px-3 {% if active_tab == 'overview' %}active bg-primary text-white{% else %}text-secondary bg-white border{% endif %}" href="?tab=overview">
+                    <i class="bi bi-pie-chart-fill me-1"></i> Overview & Balances
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link py-1 px-3 {% if active_tab == 'expenses' %}active bg-primary text-white{% else %}text-secondary bg-white border{% endif %}" href="?tab=expenses">
+                    <i class="bi bi-receipt me-1"></i> Expenses & Settlements
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link py-1 px-3 {% if active_tab == 'imports' %}active bg-primary text-white{% else %}text-secondary bg-white border{% endif %}" href="?tab=imports">
+                    <i class="bi bi-cloud-arrow-up-fill me-1"></i> CSV Import History
+                </a>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<!-- Conditionally Render Tabs -->
+
+{% if active_tab == 'overview' %}
 <div class="row">
-    <!-- Left Column: Balances, Simplified Debts, Explain Panel -->
+    <!-- Left Column: Balances, Debt Simplification, Audit explanation -->
     <div class="col-lg-5 mb-4">
         <!-- Balances Summary Card -->
-        <div class="card glass-card border-0 p-4 mb-4">
-            <h4 class="mb-3 text-dark d-flex align-items-center justify-content-between">
-                <span><i class="bi bi-bank2 text-primary me-2"></i> Group Balances</span>
+        <div class="card bg-white border border-light-subtle shadow-sm p-4 mb-4" style="border-radius: 12px;">
+            <h4 class="mb-3 text-dark fw-bold" style="font-size: 16px;">
+                <i class="bi bi-bank2 text-primary me-2"></i> Group Balances
             </h4>
             <div class="table-responsive">
                 <table class="table table-hover align-middle">
@@ -62,9 +93,9 @@
                         {% for p_id, bal in balances.items %}
                         <tr style="cursor: pointer;" onclick="showExplanation('{{ p_id }}', '{{ bal.participant.name }}')" class="member-row" id="row-{{ p_id }}">
                             <td>
-                                <div class="fw-semibold">{{ bal.participant.name }}</div>
+                                <div class="fw-semibold text-dark">{{ bal.participant.name }}</div>
                                 {% if bal.participant.is_external %}
-                                <span class="badge badge-external small">External</span>
+                                <span class="badge badge-external small" style="font-size: 9px;">External</span>
                                 {% endif %}
                             </td>
                             <td class="text-end fw-bold font-monospace">
@@ -81,14 +112,18 @@
                     </tbody>
                 </table>
             </div>
-            <p class="text-secondary small mb-0"><i class="bi bi-info-circle"></i> Click a participant to view their traceable audit breakdown.</p>
+            <p class="text-secondary small mb-0 mt-2" style="font-size: 11px;">
+                <i class="bi bi-info-circle"></i> Click a row to view the audit log details.
+            </p>
         </div>
 
-        <!-- Debt Simplification Card -->
-        <div class="card glass-card border-0 p-4 mb-4">
-            <h4 class="mb-3 text-dark"><i class="bi bi-arrow-left-right text-primary me-2"></i> Debt Simplification</h4>
+        <!-- Debt Simplification -->
+        <div class="card bg-white border border-light-subtle shadow-sm p-4 mb-4" style="border-radius: 12px;">
+            <h4 class="mb-3 text-dark fw-bold" style="font-size: 16px;">
+                <i class="bi bi-arrow-left-right text-primary me-2"></i> Debt Simplification
+            </h4>
             {% for simp in simplifications %}
-            <div class="alert alert-secondary border-0 d-flex justify-content-between align-items-center py-2 px-3 mb-2 font-monospace small">
+            <div class="alert alert-secondary border border-light-subtle d-flex justify-content-between align-items-center py-2 px-3 mb-2 font-monospace small">
                 <div>
                     <strong>{{ simp.from.name }}</strong> owes <strong>{{ simp.to.name }}</strong>
                 </div>
@@ -100,9 +135,9 @@
         </div>
 
         <!-- Explainable Balance Panel (Dynamic) -->
-        <div class="card border-0 shadow-sm p-4 mb-4 bg-white" id="explanation-panel" style="display: none; border-radius: 16px;">
+        <div class="card border border-light-subtle shadow-sm p-4 mb-4 bg-white" id="explanation-panel" style="display: none; border-radius: 12px;">
             <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
-                <h4 class="text-dark mb-0"><i class="bi bi-search text-info me-2"></i> Audit: <span id="exp-member-name"></span></h4>
+                <h4 class="text-dark mb-0 fw-bold" style="font-size: 15px;"><i class="bi bi-search text-info me-2"></i> Audit: <span id="exp-member-name"></span></h4>
                 <button type="button" class="btn-close" onclick="closeExplanation()"></button>
             </div>
             
@@ -112,15 +147,38 @@
         </div>
     </div>
 
-    <!-- Right Column: Expenses and Settlements -->
+    <!-- Right Column: Visual Charts and Members Timeline -->
     <div class="col-lg-7">
+        <!-- Visual Charts Card -->
+        <div class="card bg-white border border-light-subtle shadow-sm p-4 mb-4" style="border-radius: 12px;">
+            <h4 class="mb-4 text-dark fw-bold" style="font-size: 16px;"><i class="bi bi-bar-chart-fill text-primary me-2"></i> Spending Visualization</h4>
+            
+            <div class="row">
+                <!-- Balance Horizontal Bar Chart -->
+                <div class="col-md-6 mb-3">
+                    <h6 class="text-secondary fw-semibold text-center mb-2" style="font-size: 12px;">Owes (-) vs Owed (+)</h6>
+                    <div style="height: 200px; position: relative;">
+                        <canvas id="balancesChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Share Doughnut Chart -->
+                <div class="col-md-6 mb-3">
+                    <h6 class="text-secondary fw-semibold text-center mb-2" style="font-size: 12px;">Total Paid Contributions</h6>
+                    <div style="height: 200px; position: relative;">
+                        <canvas id="contributionsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Members List Card -->
-        <div class="card glass-card border-0 p-4 mb-4">
-            <h4 class="mb-3 text-dark"><i class="bi bi-people-fill text-primary me-2"></i> Members Timeline</h4>
+        <div class="card bg-white border border-light-subtle shadow-sm p-4" style="border-radius: 12px;">
+            <h4 class="mb-3 text-dark fw-bold" style="font-size: 16px;"><i class="bi bi-people-fill text-primary me-2"></i> Members Timeline</h4>
             <div class="row row-cols-1 row-cols-md-2 g-2">
                 {% for m in memberships %}
                 <div class="col">
-                    <div class="p-3 border rounded bg-light-subtle d-flex align-items-center justify-content-between">
+                    <div class="p-3 border border-light-subtle rounded bg-light-subtle d-flex align-items-center justify-content-between">
                         <div>
                             <div class="fw-semibold text-dark">{{ m.user.name }}</div>
                             <span class="badge {% if m.role == 'ADMIN' %}badge-admin{% else %}badge-member{% endif %} small mb-1">{{ m.role }}</span>
@@ -129,7 +187,7 @@
                                 {% if m.left_at %}
                                 <br><i class="bi bi-calendar-x"></i> Left: <span class="text-danger fw-semibold">{{ m.left_at }}</span>
                                 {% else %}
-                                <br><i class="bi bi-calendar-check"></i> Active
+                                <br><i class="bi bi-calendar-check text-success"></i> Active
                                 {% endif %}
                             </div>
                         </div>
@@ -138,10 +196,16 @@
                 {% endfor %}
             </div>
         </div>
+    </div>
+</div>
+{% endif %}
 
-        <!-- Expenses List Card -->
-        <div class="card glass-card border-0 p-4 mb-4">
-            <h4 class="mb-3 text-dark"><i class="bi bi-receipt-cutoff text-primary me-2"></i> Expenses</h4>
+{% if active_tab == 'expenses' %}
+<div class="row">
+    <!-- Expenses List Card -->
+    <div class="col-lg-7 mb-4">
+        <div class="card bg-white border border-light-subtle shadow-sm p-4" style="border-radius: 12px;">
+            <h4 class="mb-3 text-dark fw-bold" style="font-size: 16px;"><i class="bi bi-receipt-cutoff text-primary me-2"></i> Group Expenses</h4>
             <div class="table-responsive">
                 <table class="table table-hover align-middle">
                     <thead>
@@ -149,7 +213,7 @@
                             <th>Date</th>
                             <th>Description</th>
                             <th>Paid By</th>
-                            <th>Split Type</th>
+                            <th>Split</th>
                             <th class="text-end">Amount</th>
                         </tr>
                     </thead>
@@ -158,45 +222,79 @@
                         <tr>
                             <td class="text-secondary small font-monospace">{{ exp.expense_date|date:"Y-m-d" }}</td>
                             <td>
-                                <div class="fw-semibold">{{ exp.description }}</div>
+                                <div class="fw-semibold text-dark">{{ exp.description }}</div>
                                 <span class="badge {% if exp.status == 'ACTIVE' %}bg-success-subtle text-success{% elif exp.status == 'DRAFT' %}bg-warning-subtle text-warning{% else %}bg-secondary-subtle text-secondary{% endif %} small">
                                     {{ exp.status }}
                                 </span>
                                 {% if exp.original_amount %}
                                 <div class="text-secondary small" style="font-size: 11px;">
-                                    Converted from {{ exp.original_amount }} {{ exp.original_currency }} @ {{ exp.exchange_rate }}
+                                    Converted: {{ exp.original_amount }} {{ exp.original_currency }} @ {{ exp.exchange_rate }}
                                 </div>
                                 {% endif %}
-                                {% if exp.notes %}
-                                <div class="text-muted small font-italic mt-1"><i class="bi bi-chat-text"></i> {{ exp.notes }}</div>
-                                {% endif %}
+
                             </td>
-                            <td>{{ exp.paid_by.name }}</td>
+                            <td><span class="text-secondary small">{{ exp.paid_by.name }}</span></td>
                             <td>
                                 <span class="badge bg-secondary-subtle text-secondary small">{{ exp.get_split_type_display }}</span>
                             </td>
-                            <td class="text-end fw-bold font-monospace">₹{{ exp.amount|floatformat:2 }}</td>
+                            <td class="text-end fw-bold font-monospace text-dark">₹{{ exp.amount|floatformat:2 }}</td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="5" class="text-center text-muted py-4 small">No expenses logged.</td>
+                            <td colspan="5" class="text-center text-muted py-5 small">No expenses logged.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
+            
+            {% if expenses.has_other_pages %}
+            <nav aria-label="Expenses Page Navigation" class="mt-3">
+                <ul class="pagination pagination-sm justify-content-center mb-0">
+                    {% if expenses.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?tab=expenses&page={{ expenses.previous_page_number }}" aria-label="Previous">
+                            <span aria-hidden="true">&laquo;</span>
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled"><span class="page-link">&laquo;</span></li>
+                    {% endif %}
+                    
+                    {% for num in expenses.paginator.page_range %}
+                        {% if expenses.number == num %}
+                        <li class="page-item active"><span class="page-link bg-primary border-primary">{{ num }}</span></li>
+                        {% elif num > expenses.number|add:'-3' and num < expenses.number|add:'3' %}
+                        <li class="page-item"><a class="page-link" href="?tab=expenses&page={{ num }}">{{ num }}</a></li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if expenses.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?tab=expenses&page={{ expenses.next_page_number }}" aria-label="Next">
+                            <span aria-hidden="true">&raquo;</span>
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled"><span class="page-link">&raquo;</span></li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
         </div>
+    </div>
 
-        <!-- Settlements List Card -->
-        <div class="card glass-card border-0 p-4 mb-4">
-            <h4 class="mb-3 text-dark"><i class="bi bi-wallet2 text-success me-2"></i> Settlements</h4>
+    <!-- Settlements List Card -->
+    <div class="col-lg-5 mb-4">
+        <div class="card bg-white border border-light-subtle shadow-sm p-4" style="border-radius: 12px;">
+            <h4 class="mb-3 text-dark fw-bold" style="font-size: 16px;"><i class="bi bi-wallet2 text-success me-2"></i> Settlements Log</h4>
             <div class="table-responsive">
                 <table class="table table-hover align-middle">
                     <thead>
                         <tr>
                             <th>Date</th>
-                            <th>Payer</th>
-                            <th>Receiver</th>
+                            <th>From (Payer)</th>
+                            <th>To (Receiver)</th>
                             <th class="text-end">Amount</th>
                         </tr>
                     </thead>
@@ -204,23 +302,29 @@
                         {% for setl in settlements %}
                         <tr>
                             <td class="text-secondary small font-monospace">{{ setl.date|date:"Y-m-d" }}</td>
-                            <td><strong>{{ setl.payer.name }}</strong></td>
-                            <td><strong>{{ setl.receiver.name }}</strong></td>
+                            <td><strong class="text-dark">{{ setl.payer.name }}</strong></td>
+                            <td><strong class="text-dark">{{ setl.receiver.name }}</strong></td>
                             <td class="text-end fw-bold font-monospace text-success">₹{{ setl.amount|floatformat:2 }}</td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="4" class="text-center text-muted py-4 small">No settlements recorded.</td>
+                            <td colspan="4" class="text-center text-muted py-5 small">No settlements recorded.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
+    </div>
+</div>
+{% endif %}
 
-        <!-- Import History Card -->
-        <div class="card glass-card border-0 p-4">
-            <h4 class="mb-3 text-dark"><i class="bi bi-cloud-arrow-up-fill text-primary me-2"></i> CSV Import History</h4>
+{% if active_tab == 'imports' %}
+<div class="row">
+    <!-- CSV Import History Card -->
+    <div class="col-12 mb-4">
+        <div class="card bg-white border border-light-subtle shadow-sm p-4" style="border-radius: 12px;">
+            <h4 class="mb-3 text-dark fw-bold" style="font-size: 16px;"><i class="bi bi-cloud-arrow-up-fill text-primary me-2"></i> CSV Import Logs</h4>
             <div class="table-responsive">
                 <table class="table table-hover align-middle">
                     <thead>
@@ -235,7 +339,7 @@
                         {% for sess in import_history %}
                         <tr>
                             <td class="text-secondary small font-monospace">{{ sess.created_at|date:"Y-m-d H:i" }}</td>
-                            <td>{{ sess.file_name }}</td>
+                            <td class="text-dark fw-semibold">{{ sess.file_name }}</td>
                             <td>
                                 <span class="badge {% if sess.status == 'IMPORTED' %}bg-success-subtle text-success{% elif sess.status == 'PENDING_REVIEW' %}bg-warning-subtle text-warning{% else %}bg-danger-subtle text-danger{% endif %}">
                                     {{ sess.get_status_display }}
@@ -246,16 +350,16 @@
                                     {% if user.role == 'ADMIN' %}
                                     <a href="{% url 'import_review' sess.id %}" class="btn btn-warning btn-sm fw-bold">Review</a>
                                     {% else %}
-                                    <span class="small text-muted">Awaiting Admin</span>
+                                    <span class="small text-muted">Awaiting Admin Approval</span>
                                     {% endif %}
                                 {% else %}
-                                <a href="{% url 'import_report' sess.id %}" class="btn btn-outline-secondary btn-sm">Report</a>
+                                <a href="{% url 'import_report' sess.id %}" class="btn btn-outline-secondary btn-sm">View Report</a>
                                 {% endif %}
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="4" class="text-center text-muted py-4 small">No import history.</td>
+                            <td colspan="4" class="text-center text-muted py-5 small">No CSV import sessions found.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -264,6 +368,7 @@
         </div>
     </div>
 </div>
+{% endif %}
 
 <!-- Ledger Explanations Data (JSON parsed in JS) -->
 <script>
@@ -322,12 +427,12 @@
             }
 
             html += `
-                <div class="list-group-item border-0 px-0 py-3">
+                <div class="list-group-item border-0 px-0 py-2">
                     <div class="d-flex justify-content-between align-items-start mb-1">
                         <div>
-                            <span class="small font-monospace text-secondary">${item.date}</span>
-                            <div class="fw-semibold text-dark">${item.description}</div>
-                            <span class="small text-muted d-block" style="font-size: 11px;">${item.details}</span>
+                            <span class="small font-monospace text-secondary" style="font-size: 11px;">${item.date}</span>
+                            <div class="fw-semibold text-dark" style="font-size: 13px;">${item.description}</div>
+                            <span class="small text-muted d-block" style="font-size: 10px;">${item.details}</span>
                         </div>
                         <div class="text-end">
                             <span class="fw-bold font-monospace ${colorClass}">${sign}₹${amountVal.toFixed(2)}</span>
@@ -343,7 +448,7 @@
         const signTotal = runningTotal >= 0 ? '+' : '-';
         const colorTotal = runningTotal >= 0 ? 'text-success' : 'text-danger';
         html += `
-            <div class="border-top pt-3 mt-2 d-flex justify-content-between align-items-center fw-bold">
+            <div class="border-top pt-3 mt-2 d-flex justify-content-between align-items-center fw-bold" style="font-size: 14px;">
                 <span class="text-dark">Audit Net Position</span>
                 <span class="font-monospace ${colorTotal}">${signTotal}₹${Math.abs(runningTotal).toFixed(2)}</span>
             </div>
@@ -361,5 +466,82 @@
         document.getElementById('explanation-panel').style.display = 'none';
         document.querySelectorAll('.member-row').forEach(r => r.classList.remove('table-active'));
     }
+
+    // Chart.js render logic
+    {% if active_tab == 'overview' %}
+    document.addEventListener("DOMContentLoaded", function () {
+        // Balances Data
+        const chartBalancesData = [
+            {% for b in chart_balances_json %}
+            { name: "{{ b.name }}", net: {{ b.net }} },
+            {% endfor %}
+        ];
+
+        // Spend Contributions Data
+        const contributionsData = [
+            {% for c in contributions_json %}
+            { name: "{{ c.name }}", spent: {{ c.spent }} },
+            {% endfor %}
+        ];
+
+        // 1. Net Balances Bar Chart
+        const ctx1 = document.getElementById('balancesChart').getContext('2d');
+        new Chart(ctx1, {
+            type: 'bar',
+            data: {
+                labels: chartBalancesData.map(d => d.name),
+                datasets: [{
+                    data: chartBalancesData.map(d => d.net),
+                    backgroundColor: chartBalancesData.map(d => d.net >= 0 ? '#2da44e' : '#cf222e'),
+                    borderColor: chartBalancesData.map(d => d.net >= 0 ? '#22863a' : '#b61b24'),
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { font: { family: 'SFMono-Regular, Consolas, monospace', size: 10 } }
+                    },
+                    y: {
+                        grid: { display: false },
+                        ticks: { font: { size: 11 } }
+                    }
+                }
+            }
+        });
+
+        // 2. Contributions Doughnut Chart
+        const ctx2 = document.getElementById('contributionsChart').getContext('2d');
+        new Chart(ctx2, {
+            type: 'doughnut',
+            data: {
+                labels: contributionsData.map(d => d.name),
+                datasets: [{
+                    data: contributionsData.map(d => d.spent),
+                    backgroundColor: ['#0969da', '#2da44e', '#bf8700', '#8250df', '#cf222e', '#24292f'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { 
+                        position: 'bottom',
+                        labels: { boxWidth: 12, font: { size: 10 } }
+                    }
+                }
+            }
+        });
+    });
+    {% endif %}
 </script>
 {% endblock %}

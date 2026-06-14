@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+
+{% block title %}CSV Import Reports - SplitAudit{% endblock %}
+
+{% block content %}
+<div class="row align-items-center mb-4">
+    <div class="col">
+        <h1 class="text-dark mb-1 fw-bold">Import Reports</h1>
+        <p class="text-muted mb-0">Audit history and diagnostic logs of all ingestion transactions.</p>
+    </div>
+</div>
+
+<div class="card bg-white border-0 shadow-sm p-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="text-dark mb-0"><i class="bi bi-file-earmark-bar-graph-fill text-primary me-2"></i> Completed Import Sessions</h4>
+    </div>
+    
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Date Uploaded</th>
+                    <th>File Name</th>
+                    <th>Group</th>
+                    <th>Uploaded By</th>
+                    <th>Status</th>
+                    <th>Import Integrity</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sess in sessions %}
+                <tr>
+                    <td class="text-secondary small font-monospace">{{ sess.created_at|date:"Y-m-d H:i" }} UTC</td>
+                    <td class="fw-semibold text-dark">{{ sess.file_name }}</td>
+                    <td><span class="badge badge-member bg-light text-dark border">{{ sess.group.name }}</span></td>
+                    <td><span class="text-secondary small">{{ sess.uploaded_by.name }}</span></td>
+                    <td>
+                        <span class="badge {% if sess.status == 'IMPORTED' %}bg-success-subtle text-success{% elif sess.status == 'PENDING_REVIEW' %}bg-warning-subtle text-warning{% else %}bg-secondary-subtle text-secondary{% endif %}">
+                            {{ sess.get_status_display }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="small text-muted d-block" style="font-size: 11px;">
+                            Rows: {{ sess.rows.count }} &bull; Anomalies: {{ sess.anomalies.count }}
+                        </span>
+                    </td>
+                    <td class="text-end">
+                        <div class="d-inline-flex gap-2">
+                            {% if sess.status == 'PENDING_REVIEW' %}
+                                {% if user.role == 'ADMIN' %}
+                                <a href="{% url 'import_review' sess.id %}" class="btn btn-warning btn-sm fw-bold">Review</a>
+                                {% else %}
+                                <span class="small text-muted">Awaiting Admin</span>
+                                {% endif %}
+                            {% else %}
+                            <a href="{% url 'import_report' sess.id %}" class="btn btn-outline-secondary btn-sm">
+                                <i class="bi bi-file-earmark-text"></i> View Report
+                            </a>
+                            <a href="?download={{ sess.id }}" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-download"></i> Download Audit
+                            </a>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-5">
+                        <i class="bi bi-file-earmark-x fs-1 d-block mb-2 text-secondary"></i>
+                        No import sessions have been recorded.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

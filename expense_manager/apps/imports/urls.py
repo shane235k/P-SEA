@@ -10,4 +10,5 @@ urlpatterns = [
     path('imports/session/<int:session_id>/row/<int:row_id>/resolve-duplicate/', views.resolve_duplicate_view, name='resolve_duplicate'),
     path('imports/session/<int:session_id>/finalize/', views.finalize_import_view, name='finalize_import'),
     path('imports/session/<int:session_id>/report/', views.import_report_view, name='import_report'),
+    path('imports/session/<int:session_id>/pdf/', views.import_report_pdf_view, name='import_report_pdf'),
 ]

@@ -282,3 +282,58 @@ def resolve_duplicate_view(request, session_id, row_id):
             
     return redirect('import_review', session_id=session.id)
 
+
+@login_required
+def import_report_pdf_view(request, session_id):
+    session = get_object_or_404(ImportSession, id=session_id)
+    
+    # Auth check
+    user_memberships = GroupMembership.objects.filter(user=request.user)
+    user_groups = [m.group for m in user_memberships]
+    if request.user.role != 'ADMIN' and session.group not in user_groups:
+        messages.error(request, "Access denied.")
+        return redirect('dashboard')
+        
+    report = request.session.get(f'report_{session.id}', None)
+    if not report:
+        report = {
+            'session_id': session.id,
+            'group_name': session.group.name,
+            'file_name': session.file_name,
+            'uploaded_by': session.uploaded_by.name if session.uploaded_by else 'System',
+            'status': session.status,
+            'rows_processed': session.rows.count(),
+            'rows_imported': session.rows.filter(is_imported=True).count(),
+            'rows_rejected': session.rows.filter(status='REJECTED').count(),
+            'anomalies_detected': session.anomalies.count(),
+            'timestamp': session.created_at.strftime('%Y-%m-%d %H:%M:%S UTC'),
+            'executor': session.uploaded_by.name if session.uploaded_by else 'System'
+        }
+        
+    rows = session.rows.all().order_by('row_number').prefetch_related('anomalies')
+    
+    # Calculate anomaly counts by type for Chart.js
+    anomaly_types = {}
+    for anom in session.anomalies.all():
+        t = anom.type
+        anomaly_types[t] = anomaly_types.get(t, 0) + 1
+        
+    anomaly_types_list = [{'type': k, 'count': v} for k, v in anomaly_types.items()]
+    
+    import json
+    auto_created_accounts = []
+    if session.auto_created_accounts_json:
+        try:
+            auto_created_accounts = json.loads(session.auto_created_accounts_json)
+        except Exception:
+            pass
+            
+    context = {
+        'session': session,
+        'report': report,
+        'rows': rows,
+        'auto_created_accounts': auto_created_accounts,
+        'anomaly_types_json': anomaly_types_list
+    }
+    return render(request, 'imports/report_pdf.html', context)
+

@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% load custom_filters %}
+
+{% block title %}My Profile - SplitAudit{% endblock %}
+
+{% block content %}
+<div class="row align-items-center mb-4">
+    <div class="col">
+        <h1 class="text-dark mb-1 fw-bold">My Profile</h1>
+        <p class="text-muted mb-0">View your active flat share accounts, memberships timelines, and spend contribution totals.</p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- User Card -->
+    <div class="col-lg-4 mb-4">
+        <div class="card bg-white border-0 shadow-sm p-4 text-center">
+            <div class="d-inline-flex p-3 rounded-circle bg-light-subtle text-primary border mx-auto mb-3" style="width: fit-content;">
+                <i class="bi bi-person-fill fs-2"></i>
+            </div>
+            <h3 class="text-dark mb-1 fw-bold">{{ user.name }}</h3>
+            <p class="text-secondary small font-monospace mb-2">{{ user.email }}</p>
+            <div class="mb-3">
+                <span class="badge {% if user.role == 'ADMIN' %}badge-admin{% else %}badge-member{% endif %}">
+                    Role: {{ user.role }}
+                </span>
+            </div>
+            
+            <div class="border-top pt-3 text-start">
+                <span class="text-secondary small d-block mb-1">Participant Record:</span>
+                <span class="fw-bold text-dark"><i class="bi bi-check-circle-fill text-success me-1"></i> Connected as <code>{{ participant.name }}</code></span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Balance & Spending Aggregates -->
+    <div class="col-lg-8 mb-4">
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="card bg-white border-0 shadow-sm p-3 h-100">
+                    <span class="text-secondary small font-monospace d-block" style="font-size: 10px; letter-spacing: 0.5px;">TOTAL NET POSITION</span>
+                    {% if total_net > 0 %}
+                        <strong class="text-success fs-4 font-monospace d-block mt-2">+₹{{ total_net|floatformat:2 }}</strong>
+                    {% elif total_net < 0 %}
+                        <strong class="text-danger fs-4 font-monospace d-block mt-2">-₹{{ total_net|absolute|floatformat:2 }}</strong>
+                    {% else %}
+                        <strong class="text-secondary fs-4 font-monospace d-block mt-2">₹0.00</strong>
+                    {% endif %}
+                    <span class="text-muted small mt-2 d-block" style="font-size: 11px;">Aggregated across all joined groups.</span>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-white border-0 shadow-sm p-3 h-100">
+                    <span class="text-secondary small font-monospace d-block" style="font-size: 10px; letter-spacing: 0.5px;">TOTAL PAID OUT</span>
+                    <strong class="text-dark fs-4 font-monospace d-block mt-2">₹{{ total_paid|floatformat:2 }}</strong>
+                    <span class="text-muted small mt-2 d-block" style="font-size: 11px;">Total amount you have directly paid.</span>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-white border-0 shadow-sm p-3 h-100">
+                    <span class="text-secondary small font-monospace d-block" style="font-size: 10px; letter-spacing: 0.5px;">YOUR TOTAL SHARE</span>
+                    <strong class="text-dark fs-4 font-monospace d-block mt-2">₹{{ total_shares|floatformat:2 }}</strong>
+                    <span class="text-muted small mt-2 d-block" style="font-size: 11px;">Total split charges assigned to you.</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Memberships Timeline Card -->
+        <div class="card bg-white border-0 shadow-sm p-4">
+            <h4 class="text-dark mb-3"><i class="bi bi-folder-fill text-warning me-2"></i> Group Membership Timelines</h4>
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Group Name</th>
+                            <th>Role in Group</th>
+                            <th>Date Joined</th>
+                            <th>Date Left</th>
+                            <th>Membership Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in memberships %}
+                        <tr>
+                            <td class="fw-semibold text-dark"><a href="{% url 'group_detail' m.group.id %}" class="text-decoration-none text-dark">{{ m.group.name }}</a></td>
+                            <td><span class="badge {% if m.role == 'ADMIN' %}badge-admin{% else %}badge-member{% endif %}">{{ m.role }}</span></td>
+                            <td class="text-secondary small font-monospace">{{ m.joined_at }}</td>
+                            <td class="text-secondary small font-monospace">
+                                {% if m.left_at %}
+                                <span class="text-danger fw-semibold">{{ m.left_at }}</span>
+                                {% else %}
+                                &mdash;
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if m.left_at %}
+                                <span class="badge bg-secondary-subtle text-secondary border">Left / Inactive</span>
+                                {% else %}
+                                <span class="badge bg-success-subtle text-success border">Active</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">You are not a member of any group yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

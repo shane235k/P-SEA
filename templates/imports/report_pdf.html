@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Import Report PDF - Session #{{ session.id }}</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background-color: #ffffff;
+            color: #24292f;
+            font-size: 12px;
+            padding: 20px;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: #24292f;
+            font-weight: 700;
+        }
+        .report-header {
+            border-bottom: 2px solid #d0d7de;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        .card {
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #ffffff;
+        }
+        .table {
+            font-size: 11px;
+            border-color: #d0d7de !important;
+        }
+        .table thead th {
+            background-color: #f6f8fa !important;
+            color: #24292f !important;
+            border-bottom: 2px solid #d0d7de !important;
+        }
+        code {
+            font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, monospace !important;
+            background-color: rgba(175,184,193,0.2) !important;
+            color: #24292f !important;
+            padding: 1px 3px !important;
+            border-radius: 4px !important;
+            font-size: 10px !important;
+        }
+        
+        /* Print optimizations */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                padding: 0;
+            }
+            .card {
+                box-shadow: none !important;
+                page-break-inside: avoid;
+            }
+            tr {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Controls visible on screen but hidden on print -->
+    <div class="container-fluid no-print mb-4 p-3 bg-light rounded border border-light-subtle d-flex justify-content-between align-items-center">
+        <div>
+            <h5 class="mb-1 text-dark fw-bold"><i class="bi bi-printer"></i> Document PDF Generator</h5>
+            <p class="text-secondary mb-0 small">This page is print-optimized. Select "Save as PDF" as your destination printer.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button onclick="window.print()" class="btn btn-primary btn-sm fw-bold">
+                <i class="bi bi-file-earmark-pdf-fill"></i> Save/Print PDF
+            </button>
+            <button onclick="window.close()" class="btn btn-outline-secondary btn-sm">
+                Close Window
+            </button>
+        </div>
+    </div>
+
+    <!-- Printable Report Container -->
+    <div class="container-fluid">
+        <!-- Header -->
+        <div class="report-header d-flex justify-content-between align-items-end">
+            <div>
+                <h2 class="text-dark mb-1"><i class="bi bi-wallet2 text-primary"></i> SplitAudit Execution Audit Report</h2>
+                <p class="text-muted mb-0 small">
+                    Session #{{ session.id }} &bull; File: <code>{{ report.file_name }}</code> &bull; Uploaded on: {{ report.timestamp }}
+                </p>
+            </div>
+            <div class="text-end font-monospace small">
+                <strong>Group:</strong> {{ report.group_name }}<br>
+                <strong>Operator:</strong> {{ report.executor }}
+            </div>
+        </div>
+
+        <!-- Metric Summaries -->
+        <div class="row g-3 mb-4 font-monospace text-center">
+            <div class="col-3">
+                <div class="card p-3">
+                    <div class="text-muted small" style="font-size: 9px;">ROWS PROCESSED</div>
+                    <h3 class="fw-bold mb-0 text-dark">{{ report.rows_processed }}</h3>
+                </div>
+            </div>
+            <div class="col-3">
+                <div class="card p-3 border-success border-start border-4">
+                    <div class="text-success small" style="font-size: 9px;">ROWS IMPORTED</div>
+                    <h3 class="fw-bold mb-0 text-success">{{ report.rows_imported }}</h3>
+                </div>
+            </div>
+            <div class="col-3">
+                <div class="card p-3 border-danger border-start border-4">
+                    <div class="text-danger small" style="font-size: 9px;">ROWS REJECTED</div>
+                    <h3 class="fw-bold mb-0 text-danger">{{ report.rows_rejected }}</h3>
+                </div>
+            </div>
+            <div class="col-3">
+                <div class="card p-3 border-warning border-start border-4">
+                    <div class="text-warning small" style="font-size: 9px;">ANOMALIES DETECTED</div>
+                    <h3 class="fw-bold mb-0 text-warning">{{ report.anomalies_detected }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Visual Charts in PDF -->
+        <div class="row mb-4">
+            <div class="col-6">
+                <div class="card p-3">
+                    <h6 class="text-secondary fw-semibold text-center mb-3">Row Ingestion Status</h6>
+                    <div style="height: 160px; position: relative;">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="card p-3">
+                    <h6 class="text-secondary fw-semibold text-center mb-3">Anomaly Breakdown</h6>
+                    <div style="height: 160px; position: relative;">
+                        <canvas id="anomalyChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dev Users List if applicable -->
+        {% if auto_created_accounts %}
+        <div class="card p-4 border-warning mb-4">
+            <h5 class="text-warning-emphasis mb-2"><i class="bi bi-person-plus-fill"></i> Auto-Created Developer Accounts</h5>
+            <p class="text-secondary small mb-3">The following accounts were automatically created for new participants identified in the CSV file.</p>
+            <table class="table table-bordered table-sm align-middle mb-0 font-monospace">
+                <thead class="table-light">
+                    <tr>
+                        <th>Participant Name</th>
+                        <th>Email (Username)</th>
+                        <th>Temp Password</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for acc in auto_created_accounts %}
+                    <tr>
+                        <td><strong>{{ acc.name }}</strong></td>
+                        <td><code>{{ acc.email }}</code></td>
+                        <td><strong class="text-primary">{{ acc.password }}</strong></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- Detailed Execution Ledger -->
+        <div class="card p-3">
+            <h5 class="mb-3 text-dark fw-bold"><i class="bi bi-list-check"></i> Complete Audit Trail Ledger</h5>
+            <table class="table table-bordered table-striped align-middle">
+                <thead>
+                    <tr>
+                        <th style="width: 40px;" class="text-center">Line</th>
+                        <th style="width: 140px;">Raw CSV Input</th>
+                        <th style="width: 140px;">Resolved/Imported Output</th>
+                        <th style="width: 90px;" class="text-center">Status</th>
+                        <th>Logged Anomalies & Decision Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                    <tr>
+                        <td class="text-center font-monospace fw-bold">{{ row.row_number }}</td>
+                        <td>
+                            <div class="font-monospace text-secondary" style="font-size: 10px;">
+                                Date: {{ row.date }}<br>
+                                Desc: {{ row.description }}<br>
+                                Payer: {{ row.paid_by }}<br>
+                                Amt: {{ row.amount }} {{ row.currency }}
+                            </div>
+                        </td>
+                        <td>
+                            {% if row.status == 'REJECTED' %}
+                            <span class="text-danger small font-italic">Row Rejected</span>
+                            {% else %}
+                            <div class="font-monospace text-success" style="font-size: 10px;">
+                                Date: {{ row.resolved_date }}<br>
+                                Desc: {{ row.resolved_description }}<br>
+                                Payer: {{ row.resolved_paid_by_name }}<br>
+                                Amt: ₹{{ row.resolved_amount }}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if row.status == 'REJECTED' %}
+                            <span class="badge bg-danger">REJECTED</span>
+                            {% else %}
+                            <span class="badge bg-success">IMPORTED</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% for anom in row.anomalies.all %}
+                            <div class="p-1 mb-1 bg-light rounded text-secondary" style="font-size: 10px;">
+                                <strong>{{ anom.type }} ({{ anom.severity }})</strong><br>
+                                Suggested Fix: {{ anom.suggested_fix }} &bull; Decision: {{ anom.get_decision_display }}
+                            </div>
+                            {% empty %}
+                            <span class="text-success small"><i class="bi bi-check-circle"></i> Clean</span>
+                            {% endfor %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Chart rendering and auto print trigger -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            // Status Chart Data
+            const successCount = {{ report.rows_imported }};
+            const rejectCount = {{ report.rows_rejected }};
+
+            // Anomaly Data
+            const anomalyData = [
+                {% for item in anomaly_types_json %}
+                { type: "{{ item.type }}", count: {{ item.count }} },
+                {% endfor %}
+            ];
+
+            // 1. Status Doughnut Chart
+            const ctx1 = document.getElementById('statusChart').getContext('2d');
+            new Chart(ctx1, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Imported', 'Rejected'],
+                    datasets: [{
+                        data: [successCount, rejectCount],
+                        backgroundColor: ['#2da44e', '#cf222e'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } }
+                    }
+                }
+            });
+
+            // 2. Anomaly Horizontal Bar Chart
+            const ctx2 = document.getElementById('anomalyChart').getContext('2d');
+            new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: anomalyData.map(d => d.type),
+                    datasets: [{
+                        data: anomalyData.map(d => d.count),
+                        backgroundColor: '#bf8700',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: { ticks: { font: { size: 8 } } },
+                        y: { ticks: { font: { size: 8 } } }
+                    }
+                }
+            });
+
+            // Automatically trigger the Print dialog after charts are drawn
+            setTimeout(function() {
+                window.print();
+            }, 1200);
+        });
+    </script>
+</body>
+</html>
