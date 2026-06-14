@@ -514,12 +514,39 @@ def flush_group_data_view(request, group_id):
         settlements_count = group.settlements.count()
         sessions_count = group.import_sessions.count()
         
+        # Identify auto-created CustomUsers and Participants
+        import json
+        from django.db import models
+        emails_to_delete = []
+        names_to_delete = []
+        for session in group.import_sessions.all():
+            if session.auto_created_accounts_json:
+                try:
+                    accs = json.loads(session.auto_created_accounts_json)
+                    for acc in accs:
+                        emails_to_delete.append(acc['email'])
+                        names_to_delete.append(acc['name'])
+                except Exception:
+                    pass
+        
         # Delete items
         group.expenses.all().delete()
         group.settlements.all().delete()
+        
+        # Delete auto-created accounts and participants
+        users = CustomUser.objects.filter(email__in=emails_to_delete)
+        participants = Participant.objects.filter(models.Q(user__in=users) | models.Q(name__in=names_to_delete))
+        
+        participants_count = participants.count()
+        users_count = users.count()
+        
+        participants.delete()
+        users.delete()
+        
+        # Delete import sessions
         group.import_sessions.all().delete()
         
-        messages.success(request, f"Successfully flushed all data for group '{group.name}': {expenses_count} expenses, {settlements_count} settlements, and {sessions_count} import sessions deleted.")
+        messages.success(request, f"Successfully flushed all data for group '{group.name}': {expenses_count} expenses, {settlements_count} settlements, {sessions_count} import sessions, {participants_count} auto-created participants, and {users_count} user accounts deleted.")
         return redirect('group_detail', group_id=group.id)
         
     return redirect('group_detail', group_id=group.id)

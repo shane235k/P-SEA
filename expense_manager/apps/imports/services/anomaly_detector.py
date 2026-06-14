@@ -191,13 +191,12 @@ def detect_anomalies(session):
             row.anomalies.all().update(is_resolved=True, decision='REJECTED')
             continue
             
-        # Store existing anomaly decisions
-        existing_decisions = {}
-        for a in row.anomalies.all():
-            existing_decisions[(a.type, a.raw_value.strip())] = (a.is_resolved, a.decision)
-            
-        # Delete any existing anomalies for this row first
-        row.anomalies.all().delete()
+        # Fetch existing anomalies on this row
+        existing_anomalies = list(row.anomalies.all())
+        existing_decisions = {
+            (ext.type, ext.raw_value.strip()): (ext.is_resolved, ext.decision)
+            for ext in existing_anomalies
+        }
         
         # We will collect anomalies for this row in memory first
         row_anomalies = []
@@ -251,35 +250,43 @@ def detect_anomalies(session):
         # -------------------------------------------------------------
         # Rule 5 & 6: Name Normalization (INFO) & Alias Mapping (WARNING)
         # -------------------------------------------------------------
-        if res_payer:
-            raw_p_name = res_payer.strip()
-            norm_p_name = raw_p_name.lower()
-            
-            # Check for Alias Mapping (Priya S -> Priya)
-            alias_match = re.match(r'^([a-zA-Z]+)\s+[a-zA-Z]$', raw_p_name)
+        alias_detected = False
+        if row.paid_by:
+            raw_orig_p = row.paid_by.strip()
+            alias_match = re.match(r'^([a-zA-Z]+)\s+[a-zA-Z]$', raw_orig_p)
             potential_base = alias_match.group(1) if alias_match else None
             
             if potential_base and potential_base.lower() in participant_name_map:
                 base_proper_name = participant_name_map[potential_base.lower()].name
-                if raw_p_name != base_proper_name:
-                    # Check if user already decided to keep this raw name and create a new participant/user
-                    is_edited = False
-                    for (t, rv), (is_res, dec) in existing_decisions.items():
-                        if t == 'ALIAS_MAPPING' and dec == 'EDITED':
+                alias_detected = True
+                
+                # Check if this anomaly is already resolved by the user
+                is_resolved_already = False
+                is_edited = False
+                for (t, rv), (is_res, dec) in existing_decisions.items():
+                    if t == 'ALIAS_MAPPING' and rv.strip() == f"Payer name: '{raw_orig_p}'":
+                        if is_res and dec in ['APPROVED', 'EDITED']:
+                            is_resolved_already = True
+                        if dec == 'EDITED':
                             is_edited = True
-                            break
-                    
+                        break
+                
+                if not is_resolved_already:
                     row_anomalies.append({
                         'type': 'ALIAS_MAPPING',
                         'severity': 'WARNING',
-                        'raw_value': f"Payer name: '{raw_p_name}'",
-                        'suggested_fix': f"Map alias '{raw_p_name}' to system participant '{base_proper_name}'."
+                        'raw_value': f"Payer name: '{raw_orig_p}'",
+                        'suggested_fix': f"Map alias '{raw_orig_p}' to system participant '{base_proper_name}'."
                     })
                     if is_edited:
-                        res_payer = raw_p_name
+                        res_payer = raw_orig_p
                     else:
                         res_payer = base_proper_name
-            elif norm_p_name in participant_name_map:
+
+        if not alias_detected and res_payer:
+            raw_p_name = res_payer.strip()
+            norm_p_name = raw_p_name.lower()
+            if norm_p_name in participant_name_map:
                 proper_name = participant_name_map[norm_p_name].name
                 if raw_p_name != proper_name:
                     row_anomalies.append({
@@ -614,19 +621,45 @@ def detect_anomalies(session):
         
         row.save()
 
-        # Write anomalies to database
+        # Reconcile anomalies to database without losing resolved logs
+        detected_types_and_raw = {(anom['type'], anom['raw_value'].strip()) for anom in row_anomalies}
+        
+        # 1. Update or create newly detected anomalies
         for anom in row_anomalies:
-            is_res, dec = existing_decisions.get((anom['type'], anom['raw_value'].strip()), (False, 'PENDING'))
-            ImportAnomaly.objects.create(
-                session=session,
-                row=row,
-                type=anom['type'],
-                severity=anom['severity'],
-                raw_value=anom['raw_value'],
-                suggested_fix=anom['suggested_fix'],
-                decision=dec,
-                is_resolved=is_res
-            )
+            matched_existing = None
+            for ext in existing_anomalies:
+                if ext.type == anom['type'] and ext.raw_value.strip() == anom['raw_value'].strip():
+                    matched_existing = ext
+                    break
+            
+            if matched_existing:
+                # Anomaly is still present. Keep it.
+                pass
+            else:
+                # Anomaly is newly detected. Create it.
+                ImportAnomaly.objects.create(
+                    session=session,
+                    row=row,
+                    type=anom['type'],
+                    severity=anom['severity'],
+                    raw_value=anom['raw_value'],
+                    suggested_fix=anom['suggested_fix'],
+                    decision='PENDING',
+                    is_resolved=False
+                )
+                
+        # 2. Mark anomalies that are no longer detected (resolved!) as resolved in DB
+        for ext in existing_anomalies:
+            key = (ext.type, ext.raw_value.strip())
+            if key not in detected_types_and_raw:
+                if not ext.is_resolved:
+                    ext.is_resolved = True
+                    # If it was an error or warning resolved by the user's edits, mark as EDITED
+                    if ext.severity == 'ERROR' or ext.type in ['ALIAS_MAPPING', 'DUPLICATE_ENTRY']:
+                        ext.decision = 'EDITED'
+                    else:
+                        ext.decision = 'APPROVED' # Auto-corrected
+                    ext.save()
             
     # Mark rows with errors as pending resolution, and rows without errors as clean
     for row in rows:

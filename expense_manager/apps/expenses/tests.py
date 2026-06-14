@@ -226,7 +226,8 @@ class StagingDuplicatesTestCase(TestCase):
         # Re-run: row1 should no longer be duplicate!
         detect_anomalies(self.session)
         row1_final = ImportRow.objects.get(id=row1.id)
-        self.assertFalse(row1_final.anomalies.filter(type='DUPLICATE_ENTRY').exists())
+        self.assertFalse(row1_final.anomalies.filter(type='DUPLICATE_ENTRY', is_resolved=False).exists())
+        self.assertTrue(row1_final.anomalies.filter(type='DUPLICATE_ENTRY', is_resolved=True).exists())
 
     def test_missing_user_and_auto_creation(self):
         # Create a staged row with a completely new user
@@ -340,7 +341,8 @@ class StagingDuplicatesTestCase(TestCase):
         detect_anomalies(self.session)
         row_reload3 = ImportRow.objects.get(id=row.id)
         # Since the name is now Aisha, which matches base name, the ALIAS_MAPPING warning is resolved/cleared from DB
-        self.assertFalse(row_reload3.anomalies.filter(type='ALIAS_MAPPING').exists())
+        self.assertFalse(row_reload3.anomalies.filter(type='ALIAS_MAPPING', is_resolved=False).exists())
+        self.assertTrue(row_reload3.anomalies.filter(type='ALIAS_MAPPING', is_resolved=True).exists())
 
         # Test editing GET renders dropdown and the resolve_alias views
         self.admin.role = 'ADMIN'
@@ -375,7 +377,8 @@ class StagingDuplicatesTestCase(TestCase):
         self.assertRedirects(response, reverse('import_review', args=[self.session.id]))
         row_final2 = ImportRow.objects.get(id=row.id)
         self.assertEqual(row_final2.resolved_paid_by_name, "Aisha")
-        self.assertFalse(row_final2.anomalies.filter(type='ALIAS_MAPPING').exists())
+        self.assertFalse(row_final2.anomalies.filter(type='ALIAS_MAPPING', is_resolved=False).exists())
+        self.assertTrue(row_final2.anomalies.filter(type='ALIAS_MAPPING', is_resolved=True).exists())
 
 
 

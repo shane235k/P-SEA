@@ -183,6 +183,87 @@
         </div>
         {% endif %}
 
+        <!-- Anomaly Resolution Log -->
+        <div class="card p-3 mb-4">
+            <h5 class="mb-3 text-dark fw-bold"><i class="bi bi-shield-shaded text-warning"></i> Anomaly Resolution Log</h5>
+            <p class="text-secondary small mb-3">Logs of every anomaly detected during ingestion, including automated corrections and manual administrator resolution decisions.</p>
+            <table class="table table-bordered align-middle">
+                <thead>
+                    <tr class="text-secondary font-monospace" style="font-size: 10px;">
+                        <th style="width: 40px;" class="text-center">Line</th>
+                        <th style="width: 140px;">Record Details</th>
+                        <th style="width: 140px;">Anomaly Severity & Type</th>
+                        <th style="width: 180px;">Issue Faced</th>
+                        <th>Resolution Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if session.anomalies.exists %}
+                        {% for row in rows %}
+                            {% for anom in row.anomalies.all %}
+                            <tr>
+                                <td class="text-center font-monospace fw-bold" style="font-size: 10px;">{{ row.row_number }}</td>
+                                <td>
+                                    <div class="font-monospace text-secondary" style="font-size: 9px;">
+                                        Desc: {{ row.description }}<br>
+                                        Amt: {{ row.amount }} {{ row.currency }}
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge {% if anom.severity == 'ERROR' %}bg-danger{% elif anom.severity == 'WARNING' %}bg-warning text-dark{% else %}bg-info{% endif %} font-monospace" style="font-size: 9px;">
+                                        {{ anom.severity }}: {{ anom.type }}
+                                    </span>
+                                </td>
+                                <td class="font-monospace text-secondary" style="font-size: 9px;">
+                                    {{ anom.raw_value }}
+                                </td>
+                                <td style="font-size: 10px;">
+                                    {% if row.status == 'REJECTED' %}
+                                        <strong class="text-danger">Row Rejected</strong> (Anomaly discarded)
+                                    {% elif not anom.is_resolved %}
+                                        <strong class="text-warning">Unresolved</strong> (Pending review)
+                                    {% else %}
+                                        {% if anom.type == 'DUPLICATE_ENTRY' %}
+                                            {% if anom.decision == 'REJECTED' %}
+                                                <strong class="text-danger">Resolved manually</strong>: Flagged as duplicate and rejected
+                                            {% elif anom.decision == 'APPROVED' %}
+                                                <strong class="text-success">Resolved manually</strong>: Marked as a separate transaction
+                                            {% elif anom.decision == 'EDITED' %}
+                                                <strong class="text-success">Resolved manually</strong>: Row edited and resolved
+                                            {% else %}
+                                                <strong class="text-success">Resolved</strong>: Approved
+                                            {% endif %}
+                                        {% elif anom.type == 'ALIAS_MAPPING' %}
+                                            {% if anom.decision == 'EDITED' %}
+                                                <strong class="text-success">Resolved manually</strong>: Kept alias name and created new user/participant
+                                            {% elif anom.decision == 'APPROVED' %}
+                                                <strong class="text-success">Resolved manually</strong>: Mapped alias to existing system user
+                                            {% else %}
+                                                <strong class="text-success">Resolved</strong>: Approved
+                                            {% endif %}
+                                        {% else %}
+                                            {% if anom.decision == 'EDITED' %}
+                                                <strong class="text-success">Resolved manually</strong>: Row edited and saved
+                                            {% else %}
+                                                <strong class="text-success">Resolved automatically</strong>: Auto-corrected raw values
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-3" style="font-size: 10px;">
+                                No anomalies were encountered in this import session.
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
         <!-- Detailed Execution Ledger -->
         <div class="card p-3">
             <h5 class="mb-3 text-dark fw-bold"><i class="bi bi-list-check"></i> Complete Audit Trail Ledger</h5>

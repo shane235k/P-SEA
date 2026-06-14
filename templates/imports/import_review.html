@@ -124,12 +124,25 @@
                             <!-- Flagged Anomalies -->
                             <td>
                                 {% for anom in row.anomalies.all %}
-                                <div class="p-2 border rounded mb-1 {% if anom.severity == 'ERROR' %}bg-danger-subtle border-danger-subtle text-danger-emphasis{% elif anom.severity == 'WARNING' %}bg-warning-subtle border-warning-subtle text-warning-emphasis{% else %}bg-info-subtle border-info-subtle text-info-emphasis{% endif %}">
+                                <div class="p-2 border rounded mb-1 {% if anom.is_resolved and anom.severity == 'ERROR' or anom.is_resolved and anom.type == 'DUPLICATE_ENTRY' %}bg-success-subtle border-success-subtle text-success-emphasis{% elif anom.severity == 'ERROR' %}bg-danger-subtle border-danger-subtle text-danger-emphasis{% elif anom.severity == 'WARNING' %}bg-warning-subtle border-warning-subtle text-warning-emphasis{% else %}bg-info-subtle border-info-subtle text-info-emphasis{% endif %}">
                                     <div class="d-flex justify-content-between align-items-center">
-                                        <strong style="font-size: 11px;"><i class="bi bi-info-circle-fill"></i> {{ anom.type }}</strong>
+                                        <strong style="font-size: 11px;">
+                                            {% if anom.is_resolved and anom.severity == 'ERROR' or anom.is_resolved and anom.type == 'DUPLICATE_ENTRY' %}
+                                            <i class="bi bi-check-circle-fill"></i>
+                                            {% else %}
+                                            <i class="bi bi-info-circle-fill"></i>
+                                            {% endif %}
+                                            {{ anom.type }}
+                                        </strong>
+                                        {% if anom.is_resolved and anom.severity == 'ERROR' or anom.is_resolved and anom.type == 'DUPLICATE_ENTRY' %}
+                                        <span class="badge bg-success small" style="font-size: 9px;">
+                                            RESOLVED
+                                        </span>
+                                        {% else %}
                                         <span class="badge {% if anom.severity == 'ERROR' %}bg-danger{% elif anom.severity == 'WARNING' %}bg-warning text-dark{% else %}bg-info{% endif %} small" style="font-size: 9px;">
                                             {{ anom.severity }}
                                         </span>
+                                        {% endif %}
                                     </div>
                                     <div class="small mt-1" style="font-size: 11px;">
                                         <strong>Raw value:</strong> <code>{{ anom.raw_value }}</code><br>

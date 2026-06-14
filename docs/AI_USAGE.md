@@ -10,9 +10,8 @@ This document tracks the usage of AI tools during the development of the SplitAu
 * **Key Prompts**:
   * "Create the initial implementation plan for a production-quality expense sharing Django application"
   * "The approve button should be removed(it was appearing after every record), a record can either be rejected or edited and the engine will approved it automatically based on policies"
-  * "Improved the visuals and UI add in charts and bar graphs for exact share the current user has in expenses and a graph showing everyone's proportion in total expenses, add a sidebar for navigation, and create a GitHub styled UI"
+  * "Improve the visuals and UI add in charts and bar graphs for exact share the current user has in expenses and a graph showing everyone's proportion in total expenses, add a sidebar for navigation, and create a GitHub styled UI"
 
----
 
 ## 2. AI Correction Log (3 Cases)
 
@@ -25,7 +24,6 @@ This document tracks the usage of AI tools during the development of the SplitAu
 * **How it was Corrected**:
   Added toggle button to switch between simplification or the direct payment matrix, at the same time, none of them would break it, the final net amount will be calculated based on how muchh each user received and paid.
 
----
 
 ### Case 2: Treating records with unregistered users as an anomaly and asking users to edit the cell
 
